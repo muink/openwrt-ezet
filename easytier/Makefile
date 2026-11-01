@@ -5,13 +5,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=easytier
-PKG_VERSION:=2.6.4
+PKG_VERSION:=2.7.0
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/EasyTier/EasyTier/tar.gz/refs/tags
 PKG_SOURCE_URL_FILE:=v$(PKG_VERSION)
-PKG_HASH:=352c0866da709415a837405a6ce4f51b8dfae27e5d5c1da1fb4d8f7338e46795
+PKG_HASH:=2a911ef9661398a71f85e0336f786e7e6d8a8058b1c6061454cfafb18f9c3b83
 
 PKG_MAINTAINER:=Anya Lin <hukk1996@gmail.com>
 PKG_LICENSE:=LGPL-3.0
@@ -82,30 +82,37 @@ define Package/easytier-web/config
 endef
 
 PNPM_STORE_DIR:=$(DL_DIR)/pnpm-store
-PNPM_BUILD_FILTER:={./easytier-web/**}...
 # Build EasyTier frontend using Host Node.js and pnpm.
 # node/host and node-pnpm/host install their executables into STAGING_DIR_HOSTPKG.
 define Build/Compile/Frontend
 	$(CURDIR)/.prepare-pnpm.sh $(CURDIR) $(PKG_BUILD_DIR)
 
+	# https://github.com/EasyTier/EasyTier/blob/v2.7.0/.github/actions/prepare-pnpm/action.yml#L57
 	@cd "$(PKG_BUILD_DIR)"; \
 	\
 	echo "Installing EasyTier Web dependencies..."; \
 	pnpm -r \
 		--store-dir "$(PNPM_STORE_DIR)" \
-		--filter "$(PNPM_BUILD_FILTER)" \
+		--filter "{./$(1)/**}..." \
 		install --frozen-lockfile; \
 	\
 	echo "Building EasyTier Web frontend..."; \
 	pnpm -r \
-		--filter "$(PNPM_BUILD_FILTER)" \
-		--if-present run build;
+		--workspace-concurrency=1 \
+		--filter "{./$(1)/**}..." \
+		--if-present run build; \
+	\
+	echo "Bundle config-generator with Web frontend..."; \
+	if [ -f easytier-web/frontend/dist/index.html ] && [ -f easytier-web/config-generator/dist/index.html ]; then \
+		mkdir -p easytier-web/frontend/dist/config-generator; \
+		cp -R easytier-web/config-generator/dist/. easytier-web/frontend/dist/config-generator/; \
+	fi
 endef
 
 # MIPS/MIPSel follows upstream's special build-std path.
 # Upstream does not produce easytier-web binaries for these targets.
 ifneq ($(filter mips mips64 mips64el mipsel,$(ARCH)),)
-# https://github.com/EasyTier/EasyTier/blob/v2.6.4/.github/workflows/core.yml#L195
+# https://github.com/EasyTier/EasyTier/blob/v2.7.0/.github/workflows/core.yml#L223
 define Build/Compile
 	$(if $(CONFIG_PACKAGE_easytier),\
 		RUSTC_BOOTSTRAP=1 $(CARGO_PKG_VARS) CARGO_PROFILE_RELEASE_PANIC=abort \
@@ -120,15 +127,14 @@ define Build/Compile
 	)
 endef
 else
-# https://github.com/EasyTier/EasyTier/blob/v2.6.4/.github/workflows/core.yml#L169
+# https://github.com/EasyTier/EasyTier/blob/v2.7.0/.github/workflows/core.yml#L197
 define Build/Compile
 	$(if $(CONFIG_PACKAGE_easytier),\
 		$(call Build/Compile/Cargo,easytier,--bins --features="$(EASYTIER_CORE_FEATURES)") \
 	)
 
-	# https://github.com/EasyTier/EasyTier/blob/v2.6.4/.github/actions/prepare-pnpm/action.yml#L38
 	$(if $(and $(CONFIG_PACKAGE_easytier-web),$(CONFIG_EASYTIER_WEB_EMBED)),\
-		$(call Build/Compile/Frontend) \
+		$(call Build/Compile/Frontend,easytier-web) \
 	)
 
 	$(if $(CONFIG_PACKAGE_easytier-web),\
