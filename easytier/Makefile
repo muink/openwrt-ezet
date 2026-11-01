@@ -47,10 +47,6 @@ include $(TOPDIR)/feeds/packages/lang/rust/rust-package.mk
 CARGO_PKG_VARS+= \
 	PROTOC=$(STAGING_DIR_HOSTPKG)/bin/protoc
 
-# Host tools
-NODE:=$(STAGING_DIR_HOSTPKG)/bin/node
-PNPM:=$(STAGING_DIR_HOSTPKG)/bin/pnpm
-
 # GitHub codeload archives contain a single top-level EasyTier-<version>
 # directory. Strip it so the source is placed directly in PKG_BUILD_DIR.
 TAR_OPTIONS+= --strip-components=1
@@ -85,47 +81,30 @@ define Package/easytier-web/config
 	endmenu
 endef
 
+PNPM_STORE_DIR:=$(DL_DIR)/pnpm-store
+PNPM_BUILD_FILTER:={./easytier-web/**}...
 # Build EasyTier frontend using Host Node.js and pnpm.
 # node/host and node-pnpm/host install their executables into STAGING_DIR_HOSTPKG.
 define Build/Compile/Frontend
-	@set -eu; \
-	printf 'Using Host Node.js: '; $(NODE) --version; \
-	printf 'Using Host pnpm: '; $(PNPM) --version; \
-	printf 'Node executable: '; $(NODE) -p 'process.execPath'; \
-	pushd "$(PKG_BUILD_DIR)"; \
-	\
-	$(NODE) -e '\
-		const fs = require("fs"); \
-		const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); \
-		delete pkg.pnpm; \
-		fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n"); \
-		fs.writeFileSync("pnpm-workspace.yaml", [ \
-			"packages:", \
-			"  - easytier-web/frontend", \
-			"  - easytier-web/frontend-lib", \
-			"", \
-			"overrides:", \
-			"  minimatch: 10.2.4", \
-			"", \
-			"allowBuilds:", \
-			"  esbuild: true", \
-			"  vue-demi: true", \
-			"  unrs-resolver: false" \
-		].join("\n") + "\n"); \
-	'; \
+	$(CURDIR)/.prepare-pnpm.sh $(CURDIR) $(PKG_BUILD_DIR)
+
+	@cd "$(PKG_BUILD_DIR)"; \
 	\
 	echo "Installing EasyTier Web dependencies..."; \
-	$(PNPM) -r --filter "./easytier-web/*" install; \
+	pnpm -r \
+		--store-dir "$(PNPM_STORE_DIR)" \
+		--filter "$(PNPM_BUILD_FILTER)" \
+		install --frozen-lockfile; \
 	\
 	echo "Building EasyTier Web frontend..."; \
-	$(PNPM) -r --filter "./easytier-web/*" build; \
-	\
-	popd
+	pnpm -r \
+		--filter "$(PNPM_BUILD_FILTER)" \
+		--if-present run build;
 endef
 
 # MIPS/MIPSel follows upstream's special build-std path.
 # Upstream does not produce easytier-web binaries for these targets.
-ifneq ($(filter mips mipsel,$(ARCH)),)
+ifneq ($(filter mips mips64 mips64el mipsel,$(ARCH)),)
 # https://github.com/EasyTier/EasyTier/blob/v2.6.4/.github/workflows/core.yml#L195
 define Build/Compile
 	$(if $(CONFIG_PACKAGE_easytier),\
@@ -161,7 +140,7 @@ endif
 # Platform-specific features
 # $(TOPDIR)/feeds/packages/lang/rust/rust-values.mk
 # RUST_ARCH_DEPENDS:=@(aarch64||arm||i386||loongarch64||mips||mips64||mips64el||mipsel||powerpc||powerpc64||riscv64||x86_64)
-EASYTIER_WEB_RUST_ARCH_DEPENDS:=@(aarch64||arm||i386||loongarch64||powerpc||powerpc64||riscv64||x86_64) # Architectures other than x86_64 and aarch64 have not been tested.
+EASYTIER_WEB_RUST_ARCH_DEPENDS:=@(aarch64||arm||i386||loongarch64||powerpc||powerpc64||riscv64||x86_64)
 
 define Package/easytier/Default
   SECTION:=net
