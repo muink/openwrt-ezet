@@ -81,14 +81,22 @@ define Package/easytier-web/config
 	endmenu
 endef
 
+# Host pnpm store path
 PNPM_STORE_DIR:=$(DL_DIR)/pnpm-store
+# Host WASM toolchain
+WASM_HOME:=$(DL_DIR)/easytier-wasm
+WASM_CARGO_HOME:=$(WASM_HOME)/cargo
+WASM_RUSTUP_HOME:=$(WASM_HOME)/rustup
 # Build EasyTier frontend using Host Node.js and pnpm.
 # node/host and node-pnpm/host install their executables into STAGING_DIR_HOSTPKG.
 define Build/Compile/Frontend
-	$(CURDIR)/.prepare-pnpm.sh $(CURDIR) $(PKG_BUILD_DIR)
+	$(CURDIR)/.prepare-pnpm.sh "$(CURDIR)" "$(PKG_BUILD_DIR)"
+	$(CURDIR)/.prepare-wasm.sh "$(CURDIR)" "$(PKG_BUILD_DIR)" "$(WASM_CARGO_HOME)" "$(WASM_RUSTUP_HOME)"
 
 	# https://github.com/EasyTier/EasyTier/blob/v2.7.0/.github/actions/prepare-pnpm/action.yml#L57
-	@cd "$(PKG_BUILD_DIR)"; \
+	@set -eu; \
+	cd "$(PKG_BUILD_DIR)"; \
+	. toolchain.env; \
 	\
 	echo "Installing EasyTier Web dependencies..."; \
 	pnpm -r \

@@ -28,9 +28,4 @@ node --version
 printf 'Host pnpm: '
 pnpm --version
 
-cd "$PKG_BUILD_DIR"
-
-# Migrating pnpm settings from package.json to pnpm-workspace.yaml.
-PKG_BUILD_DIR="$PKG_BUILD_DIR" node "$CURDIR/.prepare-pnpm.js"
-
 echo "pnpm preparation completed."
