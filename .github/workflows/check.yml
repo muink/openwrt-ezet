@@ -1,0 +1,30 @@
+name: EasyTier version check
+on:
+  workflow_dispatch:
+  schedule:
+  - cron: 0 16 * * 5
+  push:
+    branches:
+      - master
+
+jobs:
+  check:
+    name: Check new EasyTier version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # To push a branch
+      pull-requests: write  # To create a PR from that branch
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: EkkoG/openwrt-packages-version-checker@main
+        env:
+          COMMIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: EasyTier/EasyTier
+          BRANCH: master
+          MAKEFILE: easytier/Makefile
+          CREATE_PR: true
+          SOURCE_URL: https://codeload.github.com/EasyTier/EasyTier/tar.gz/refs/tags/v{{version}}
