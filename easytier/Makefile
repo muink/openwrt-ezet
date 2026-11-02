@@ -5,13 +5,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=easytier
-PKG_VERSION:=2.7.0
+PKG_VERSION:=2.6.4
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/EasyTier/EasyTier/tar.gz/refs/tags
 PKG_SOURCE_URL_FILE:=v$(PKG_VERSION)
-PKG_HASH:=2a911ef9661398a71f85e0336f786e7e6d8a8058b1c6061454cfafb18f9c3b83
+PKG_HASH:=352c0866da709415a837405a6ce4f51b8dfae27e5d5c1da1fb4d8f7338e46795
 
 PKG_MAINTAINER:=Anya Lin <hukk1996@gmail.com>
 PKG_LICENSE:=LGPL-3.0
