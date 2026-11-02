@@ -1,0 +1,61 @@
+#!/usr/bin/ucode
+
+'use strict';
+
+import { access, lstat, popen, readfile, writefile } from 'fs';
+import {
+	shellQuote, isEmpty,
+	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR
+} from 'ezet';
+
+function hasKernelModule(kmod) {
+	return (system(sprintf('[ -e "/lib/modules/$(uname -r)"/%s ]', shellQuote(kmod))) === 0);
+}
+
+const methods = {
+	get_features: {
+		call: function() {
+			let features = {};
+			let fd;
+
+			const use_apk = system('command -v apk') == 0 || null; // @less_25_12
+
+			features.app_version = trim(popen(`${use_apk ? 'apk list -I --manifest' : 'opkg list-installed'} luci-app-ezet | ` +
+				`awk '{print $NF}'`).read('all')) || null; // @less_25_12
+
+			for (let type in ['core', 'cli', 'web']) {
+				if (system(`command -v easytier-${type}`) == 0) {
+					fd = popen(`easytier-${type} -V`);
+					if (fd) {
+						for (let line = fd.read('line'); length(line); line = fd.read('line')) {
+							let ver = match(trim(line), /\S* (.*)/);
+							if (ver)
+								features[`${type}_version`] = split(ver[1], ' ')[0];
+						}
+
+						fd.close();
+					}
+				} else features[`${type}_version`] = null;
+			}
+
+			features.has_tun = hasKernelModule('tun.ko') || access('/etc/modules.d/30-tun');
+
+			return features;
+		}
+	},
+
+	log_clean: {
+		args: { type: 'type' },
+		call: function(req) {
+			if (!(req.args?.type in ['ezet', 'easytier-core', 'easytier-web']))
+				return { result: false, error: 'illegal type' };
+
+			const filestat = lstat(`${RUN_DIR}/${req.args?.type}.log`);
+			if (filestat)
+				writefile(`${RUN_DIR}/${req.args?.type}.log`, '');
+			return { result: true };
+		}
+	}
+};
+
+return { 'luci.ezet': methods };

@@ -1,0 +1,10 @@
+
+config ezet 'config'
+	option __warning 'ACCESS CONTROL FIELDS'
+
+config core 'global'
+	option file_log_size '5' # in MB
+	option file_log_count '1'
+	option console_log_level 'info'
+	option file_log_level 'warn'
+
