@@ -171,12 +171,15 @@ define Package/easytier-web
 endef
 
 define Package/easytier/install
+	$(CURDIR)/.prepare-upx.sh $(PKG_INSTALL_DIR)/bin/easytier-core
+	$(CURDIR)/.prepare-upx.sh $(PKG_INSTALL_DIR)/bin/easytier-cli
 	$(INSTALL_DIR) $(1)/usr/libexec/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/easytier-core $(1)/usr/libexec/easytier-core
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/easytier-cli $(1)/usr/libexec/easytier-cli
 endef
 
 define Package/easytier-web/install
+	$(CURDIR)/.prepare-upx.sh $(PKG_INSTALL_DIR)/bin/easytier-web
 	$(INSTALL_DIR) $(1)/usr/libexec/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/bin/easytier-web $(1)/usr/libexec/easytier-web
 endef
