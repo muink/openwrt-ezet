@@ -7,4 +7,4 @@
 
 BIN_PATH="$1"
 
-upx --lzma --best "$BIN_PATH" || true
+upx --best "$BIN_PATH" || true
