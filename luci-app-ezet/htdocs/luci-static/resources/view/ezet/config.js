@@ -13,16 +13,66 @@ const callGetHostInfo = rpc.declare({
 	expect: { '': {} }
 });
 
+const callGetV6GUAPrefix = rpc.declare({
+	object: 'luci.ezet',
+	method: 'detect_ipv6_gua_prefix',
+	expect: { '': {} }
+});
+
+const stubValidator = {
+	factory: validation,
+	apply(type, value, args) {
+		if (value != null)
+			this.value = value;
+
+		return validation.types[type].apply(this, args || []);
+	},
+	assert(condition) {
+		return !!condition;
+	}
+};
+
+function ipv6CidrToRange(cidr) {
+	const [addr, prefix] = cidr.split('/');
+	const words = validation.parseIPv6(addr);
+
+	const start = [];
+	const end = [];
+
+	for (let i = 0; i < 8; i++) {
+		const bits = prefix - i * 16;
+		const mask = bits <= 0 ? 0 :
+			bits >= 16 ? 0xffff :
+			(0xffff << (16 - bits)) & 0xffff;
+
+		start.push(words[i] & mask);
+		end.push((words[i] & mask) | (0xffff ^ mask));
+	}
+
+	const format = words => words
+		.map(word => word.toString(16))
+		.join(':');
+
+	return [format(start), format(end)];
+}
+
+function ipv6RangeContains(outer, inner) {
+	return stubValidator.apply('iprange6', `${outer[0]}-${inner[0]}`) &&
+		stubValidator.apply('iprange6', `${inner[1]}-${outer[1]}`);
+}
+
 return view.extend({
 	load() {
 		return Promise.all([
 			uci.load('ezet'),
 			callGetHostInfo(),
+			callGetV6GUAPrefix(),
 		]);
 	},
 
 	render(data) {
 		const hostInfo = data[1];
+		const ip6guaPrefix = data[2];
 
 		let m, s, o, ss, so;
 
@@ -75,6 +125,7 @@ return view.extend({
 
 		ss.tab('field_Base', _('Base fields'));
 		ss.tab('field_secure', _('🔒Secure fields'));
+		ss.tab('field_server', _('Server fields'));
 
 		/** Base fields **/
 		so = ss.taboption('field_Base', form.Value, 'label', _('Label'));
@@ -159,6 +210,10 @@ return view.extend({
 		so.rmempty = false;
 		so.depends('dhcpv6', '0');
 
+		so = ss.taboption('field_Base', form.Flag, 'ipv6_public_addr_auto', _('IPv6 GUA'),
+			_('Auto-obtain a IPv6 GUA from a peer that shares its IPv6 subnet.'));
+		so.default = so.disabled;
+
 		/** Secure fields **/
 		so = ss.taboption('field_secure', ez.GenValue, 'local_private_key', _('Client private key'),
 			_('Base64 encoded X25519 private key.'));
@@ -180,6 +235,61 @@ return view.extend({
 		so = ss.taboption('field_secure', ez.CopyValue, 'local_public_key', _('Client public key'),
 			_('Base64 encoded X25519 public key.'));
 		so.depends('secure_mode', '1');
+		so.modalonly = true;
+
+		/** Server fields **/
+		so = ss.taboption('field_server', form.Flag, 'ipv6_public_addr_provider', _('Share IPv6 GUA subnet'),
+			_('Share this node\'s IPv6 GUA subnet with other peers so they can obtain IPv6 GUA.'));
+		so.default = so.disabled;
+		so.modalonly = true;
+
+		so = ss.taboption('field_server', form.Value, 'ipv6_public_addr_prefix', _('Shared IPv6 GUA subnet'),
+			_('Manually specify the IPv6 GUA subnet to share, instead of auto-detecting from system routes.'));
+		so.datatype = 'cidr6';
+		if (ip6guaPrefix.result) {
+			const pd = ip6guaPrefix.result.pd;
+			const delegated = ip6guaPrefix.result.delegated || [];
+			so.placeholder = pd;
+			so.onchange = function(ev, section_id, value) {
+				if (stubValidator.apply('cidr6', value)) {
+					const UIEl = this.getUIElement(section_id);
+
+					const fmtValue = `${ipv6CidrToRange(value)[0].replace(/(:0)+/, '::')}/${value.split('/')[1]}`;
+					UIEl.setValue(fmtValue);
+
+					this.super('validate', section_id, fmtValue);
+				}
+			}
+			so.validate = function(section_id, value) {
+				const UIEl = this.getUIElement(section_id);
+				value = UIEl.getValue();
+
+				if (!value)
+					return true;
+
+				const outer = ipv6CidrToRange(pd);
+				const inner = ipv6CidrToRange(value);
+
+				if (!ipv6RangeContains(outer, inner))
+					return _('Expecting: %s').format(_('IPv6 subnet within the %s range').format(pd));
+
+				for (let route of delegated)
+					if (route.dst && route.dst === value)
+						return _('Expecting: %s').format(_('IPv6 subnet %s has been delegated').format(route.dst));
+
+				return true;
+			}
+		} else {
+			const errmsg = ip6guaPrefix.error || '';
+			so.placeholder = errmsg;
+			so.validate = function(section_id, value) {
+				if (value)
+					return _('Expecting: %s').format(errmsg);
+
+				return true;
+			}
+		}
+		so.depends('ipv6_public_addr_provider', '1');
 		so.modalonly = true;
 		/* General END */
 

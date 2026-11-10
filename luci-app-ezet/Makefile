@@ -11,6 +11,7 @@ LUCI_DEPENDS:= \
 	+easytier-cli \
 	+firewall4 \
 	+ucode-mod-digest +openssl-util \
+	+yq +ip-full \
 	#+ucode-mod-netaddr # @less_26_??
 
 PKG_NAME:=luci-app-ezet

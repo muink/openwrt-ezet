@@ -2,8 +2,11 @@
 
 'use strict';
 
+const less_26 = true;
+
 import { access, glob, lstat, popen, readfile, writefile } from 'fs';
 import * as digest from 'digest';
+//import * as netaddr from 'netaddr'; // @less_26_??
 import {
 	shellQuote, isEmpty,
 	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR
@@ -11,6 +14,395 @@ import {
 
 function hasKernelModule(kmod) {
 	return (system(sprintf('[ -e "/lib/modules/$(uname -r)"/%s ]', shellQuote(kmod))) === 0);
+}
+
+/**** // @less_26_?? START ****/
+/**
+ * IPv6 CIDR parser and prototype.
+ */
+function parseIPv6CIDR(cidr) {
+	const m = match(cidr, /^([[:xdigit:]:.]+)\/(\d{1,3})$/);
+
+	if (!m)
+		return null;
+
+	const ip = m[1];
+	const bits = int(m[2], 10);
+
+	if (bits < 0 || bits > 128)
+		return null;
+
+	if (index(ip, '%') >= 0 || index(ip, '.') >= 0)
+		return null;
+
+	const dc = index(ip, '::');
+	let groups = [];
+
+	if (dc >= 0) {
+		const leftPart = substr(ip, 0, dc);
+		const rightPart = substr(ip, dc + 2);
+
+		if (index(rightPart, '::') >= 0)
+			return null;
+
+		const left = leftPart ? split(leftPart, ':') : [];
+		const right = rightPart ? split(rightPart, ':') : [];
+
+		const zeros = 8 - length(left) - length(right);
+
+		if (zeros < 1)
+			return null;
+
+		for (let group in left)
+			push(groups, group);
+
+		for (let i = 0; i < zeros; i++)
+			push(groups, '0');
+
+		for (let group in right)
+			push(groups, group);
+	} else {
+		groups = split(ip, ':');
+	}
+
+	if (length(groups) != 8)
+		return null;
+
+	const bytes = [];
+
+	for (let i = 0; i < 8; i++) {
+		const group = groups[i];
+
+		if (!match(group, /^[0-9a-fA-F]{1,4}$/))
+			return null;
+
+		const value = int(group, 16);
+
+		bytes[i * 2] = (value >> 8) & 0xff;
+		bytes[i * 2 + 1] = value & 0xff;
+	}
+
+	return {
+		bytes,
+		bits
+	};
+}
+
+/**
+ * Parse IPv6 prefix length or netmask.
+ *
+ * @param {number|string|null} mask
+ * @param {number} fallback
+ * @returns {number}
+ */
+function parseIPv6Mask(mask, fallback) {
+	if (mask == null)
+		return fallback;
+
+	if (type(mask) == 'int' || type(mask) == 'double') {
+		const bits = int(mask);
+
+		if (bits != mask || bits < 0 || bits > 128)
+			die('Invalid netmask');
+
+		return bits;
+	}
+
+	if (type(mask) != 'string')
+		die('Invalid netmask');
+
+	// Decimal prefix length
+	if (match(mask, /^\d+$/)) {
+		const bits = int(mask, 10);
+
+		if (bits > 128)
+			die('Invalid netmask');
+
+		return bits;
+	}
+
+	// IPv6 netmask
+	const parsed = parseIPv6CIDR(`${mask}/128`);
+
+	if (parsed == null)
+		die('Invalid netmask');
+
+	// Count consecutive leading one bits.
+	let bits = 0;
+	let done = false;
+
+	for (let byte in parsed.bytes) {
+		for (let bit = 7; bit >= 0; bit--) {
+			if (!(byte & (1 << bit))) {
+				done = true;
+				break;
+			}
+
+			bits++;
+		}
+
+		if (done)
+			break;
+	}
+
+	return bits;
+}
+
+/**
+ * IPv6CIDR prototype.
+ */
+let IPv6CIDRProto;
+IPv6CIDRProto = {
+	/**
+	 * Return the original CIDR string.
+	 *
+	 * @returns {string}
+	 */
+	tostring: function() {
+		const addr = arrtoip(this.bytes);
+
+		return this.bits < 128
+			? `${addr}/${this.bits}`
+			: addr;
+	},
+
+	/**
+	 * Derive the network address.
+	 *
+	 * @param {number|string|null} mask
+	 * @returns {IPv6CIDR}
+	 */
+	network: function(mask) {
+		const bits = parseIPv6Mask(mask, this.bits);
+		const bytes = [];
+
+		for (let i = 0; i < 16; i++) {
+			const remaining = bits - i * 8;
+
+			if (remaining >= 8)
+				bytes[i] = this.bytes[i];
+			else if (remaining <= 0)
+				bytes[i] = 0;
+			else {
+				const mask = (0xff << (8 - remaining)) & 0xff;
+
+				bytes[i] = this.bytes[i] & mask;
+			}
+		}
+
+		// netaddr.range.network() returns a full-width address.
+		return proto({
+			bytes,
+			bits: 128
+		}, IPv6CIDRProto);
+	},
+
+	/**
+	 * Check whether this CIDR contains another CIDR.
+	 *
+	 * @param {IPv6CIDR|string} other
+	 * @returns {boolean}
+	 */
+	contains: function(other) {
+		if (type(other) == 'string')
+			other = IPv6CIDR(other);
+
+		if (other == null || this.bits > other.bits)
+			return false;
+
+		const fullBytes = this.bits >> 3;
+		const remainingBits = this.bits & 7;
+
+		for (let i = 0; i < fullBytes; i++) {
+			if (this.bytes[i] != other.bytes[i])
+				return false;
+		}
+
+		if (remainingBits) {
+			const mask = (0xff << (8 - remainingBits)) & 0xff;
+
+			if ((this.bytes[fullBytes] & mask) !=
+				(other.bytes[fullBytes] & mask))
+				return false;
+		}
+
+		return true;
+	},
+
+	/**
+	 * Check whether two CIDRs are exactly equal.
+	 *
+	 * @param {IPv6CIDR|string} other
+	 * @returns {boolean}
+	 */
+	equals: function(other) {
+		if (type(other) == 'string')
+			other = IPv6CIDR(other);
+
+		return other != null &&
+			this.bits == other.bits &&
+			this.contains(other);
+	}
+};
+
+/**
+ * Create an IPv6 CIDR instance.
+ *
+ * @param {string} cidr
+ * @returns {object|null}
+ */
+function IPv6CIDR(cidr) {
+	const parsed = parseIPv6CIDR(cidr);
+
+	if (parsed == null)
+		return null;
+
+	return proto(parsed, IPv6CIDRProto);
+}
+/**** // @less_26_?? END ****/
+
+// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier-core/src/peers/public_ipv6/mod.rs#L91
+function is_global_routable_public_ipv6(ip6addr) {
+	if (match(ip6addr, /^(::1?(\/|$)|(f[cd]|fe[89ab]|ff))/)) // or just match GUA: `2000::/3` ?
+		return false;
+	return true;
+}
+
+// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier/src/instance/public_ipv6_provider/linux.rs#L140
+function detect_public_ipv6_prefix_from_routes(routes) {
+	const prefixs = filter(map(routes, (route) => {
+		// is default route and routeType is unicast?
+		// 'ip -6 -j route show default type unicast'
+		if ((!route.dst || route.dst == 'default' || route.dst == '::/0') &&
+			(route.type || 'unicast') == 'unicast')
+			route.dst = '::/0';
+		else
+			return;
+
+		const src = route.from, wan_dev = route.dev;
+
+		if (!src || !wan_dev)
+			return;
+
+		// is the format correct?
+		if (!match(src, /^([[:xdigit:]:.]+)\/(\d{1,3})$/))
+			return;
+
+		// is_global_routable_public_ipv6_prefix(prefix)
+		if (!is_global_routable_public_ipv6(src))
+			return;
+
+		let prefix;
+		if (less_26) // @less_26_??
+			prefix = IPv6CIDR(src);
+		else
+			prefix = netaddr.new(src);
+
+		if (prefix.bits < 1 || prefix.bits > 128)
+			return;
+
+		let delegated = filter(routes, candidate => {
+			if (!match(candidate.dst, /^([[:xdigit:]:.]+)\/(\d{1,3})$/))
+				return;
+
+			let lan;
+			if (less_26) // @less_26_??
+				lan = IPv6CIDR(candidate.dst);
+			else
+				lan = netaddr.new(candidate.dst);
+			return prefix.contains(lan) && // rust src: candidate.dst == prefix
+			(candidate.dev != wan_dev) &&
+			(candidate.dev != 'lo') &&
+			(candidate.type || 'unicast') == 'unicast';
+		});
+
+		if (!isEmpty(delegated))
+			return {
+				pd: prefix,
+				delegated: map(delegated, (e) => {
+					return { dst: e.dst, dev: e.dev };
+				}),
+				ndp_target: null
+			};
+	}), v => v);
+
+	if (isEmpty(prefixs))
+		return;
+
+	return sort(prefixs, (a, b) => a.pd.bits - b.pd.bits)[0];
+}
+
+// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier/src/instance/public_ipv6_provider/linux.rs#L293
+function detect_public_ipv6_prefix_from_interfaces(routes, addresses, max_netmask) {
+	/**** detect_default_route_ipv6_interfaces(routes, max_netmask) START ****/
+	// collect all IPv6 unicast default-route ifname
+	const wan_ifnames = uniq(filter(map(routes, (route) => {
+		// is default route and routeType is unicast?
+		// 'ip -6 -j route show default type unicast'
+		if ((!route.dst || route.dst == 'default' || route.dst == '::/0') &&
+			(route.type || 'unicast') == 'unicast')
+			route.dst = '::/0';
+		else
+			return;
+
+		return route.dev;
+	}), v => v));
+	if (isEmpty(wan_ifnames))
+		return;
+
+	// enumerate IPv6 addresses on those interfaces
+	const candidates = [];
+	for (let addr in addresses)
+		for (let addr_info in addr.addr_info)
+			push(candidates, {
+				ifindex: addr.ifindex,
+				ifname: addr.ifname,
+				address: addr_info.local,
+				netmask: addr_info.prefixlen
+			});
+	if (isEmpty(candidates))
+		return;
+
+	// select_default_route_ipv6_interfaces(candidates, wan_ifnames, max_netmask)
+	const ifaces = filter(map(candidates, (candidate) => {
+		if (!(candidate.ifname in wan_ifnames))
+			return;
+
+		if (!is_global_routable_public_ipv6(candidate.address))
+			return;
+
+		if (candidate.netmask < 1 ||
+			candidate.netmask > max_netmask)
+			return;
+
+		let prefix;
+		if (less_26) // @less_26_??
+			prefix = IPv6CIDR(`${candidate.address}/${candidate.netmask}`);
+		else
+			prefix = netaddr.new(candidate.address, candidate.netmask);
+
+		return {
+			ifindex: candidate.ifindex,
+			ifname: candidate.ifname,
+			address: candidate.address,
+			pd: prefix
+		};
+	}), v => v);
+
+	if (isEmpty(ifaces))
+		return;
+	/**** detect_default_route_ipv6_interfaces(routes, max_netmask) END ****/
+
+	/**** select_public_ipv6_prefix_from_default_route_interfaces(ifaces) START ****/
+	const iface = sort(ifaces, (a, b) => a.pd.bits - b.pd.bits || a.ifindex - b.ifindex)[0];
+
+	return {
+		pd: iface.pd,
+		ndp_target: {
+			wan_ifname: iface.ifname
+		}
+	};
+	/**** select_public_ipv6_prefix_from_default_route_interfaces(ifaces) END ****/
 }
 
 const methods = {
@@ -138,6 +530,50 @@ const methods = {
 
 			return { machine_id: uuid_from_hash(hash, 5),
 				hostname: trim(readfile('/proc/sys/kernel/hostname')) };
+		}
+	},
+
+	// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier/src/instance/public_ipv6_provider/linux.rs#L347
+	detect_ipv6_gua_prefix: {
+		call: function() {
+			const max_netmask = 64;
+			let fd;
+
+			// get all IPv6 routes
+			let routes;
+			fd = popen('ip -6 -j route show table all');
+			if (fd) {
+				routes = json(fd);
+				fd.close();
+			} else
+				return { result: false, error: 'Failed to query linux IPv6 routes' };
+
+			// Pick from default routes
+			let prefix = detect_public_ipv6_prefix_from_routes(routes);
+			if (!isEmpty(prefix)) {
+				prefix.pd = prefix.pd.tostring();
+				return { result: prefix };
+			}
+
+			// get all IPv6 interface addresses
+			let addresses;
+			fd = popen('ip -6 -j address show');
+			if (fd) {
+				addresses = json(fd);
+				fd.close();
+			} else
+				return { result: false, error: 'Failed to query linux IPv6 addresses' };
+
+			// Fallback for DHCPv6 IA_NA / SLAAC — see https://github.com/EasyTier/EasyTier/issues/2333
+			prefix = detect_public_ipv6_prefix_from_interfaces(routes, addresses, max_netmask);
+			if (!isEmpty(prefix)) {
+				prefix.pd = less_26 // @less_26_??
+					? IPv6CIDR(`${prefix.pd.network()}/${prefix.pd.bits}`).tostring()
+					: netaddr.new(prefix.pd.network().tostring(), prefix.pd.bits).tostring();
+				return { result: prefix };
+			}
+
+			return { result: false, error: 'No prefix available' };
 		}
 	},
 

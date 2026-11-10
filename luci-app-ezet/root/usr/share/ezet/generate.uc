@@ -25,7 +25,8 @@ const uciinst = 'instance';
 
 /* Global options */
 const machine_id = uci.get(uciconf, uciglobal, 'machine_id') || ubus.call('luci.ezet', 'get_host_info')?.machine_id,
-      hostname = uci.get(uciconf, uciglobal, 'hostname') || ubus.call('luci.ezet', 'get_host_info')?.hostname;
+      hostname = uci.get(uciconf, uciglobal, 'hostname') || ubus.call('luci.ezet', 'get_host_info')?.hostname,
+      auto_ipv6_gua_prefix = ubus.call('luci.ezet', 'detect_ipv6_gua_prefix').result?.pd;
 
 /* UCI config END */
 
@@ -62,6 +63,9 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		ipv6: cfg.ipv6,
 		dhcp: (dhcp === '0') ? false : true,
 		dhcpv6: (dhcpv6 === '0') ? false : true,
+		ipv6_public_addr_provider: strToBool(cfg.ipv6_public_addr_provider) || false,
+		ipv6_public_addr_auto: strToBool(cfg.ipv6_public_addr_auto) || false,
+		ipv6_public_addr_prefix: cfg.ipv6_public_addr_prefix || auto_ipv6_gua_prefix,
 
 		/* Secure mode settings */
 		secure_mode: strToBool(cfg.secure_mode) ? {
