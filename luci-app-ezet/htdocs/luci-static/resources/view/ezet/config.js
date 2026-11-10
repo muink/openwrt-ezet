@@ -91,6 +91,117 @@ function ipv6RangeContains(outer, inner) {
 		stubValidator.apply('iprange6', `${inner[1]}-${outer[1]}`);
 }
 
+function renderURIs(s, uciconfig) {
+	let o;
+
+	o = s.option(form.DummyValue, 'uri', _('URI'));
+	o.write = form.AbstractValue.prototype.write;
+	o.remove = form.AbstractValue.prototype.remove;
+	o.editable = true;
+
+	o = s.option(ez.GroupListValue, 'scheme', _('Scheme'));
+	o.default = ez.peers_type[0].types[0][0];
+	for (const {label, types} of ez.peers_type) {
+		types.forEach((res) => o.value.call(o, res, label));
+	}
+	o.load = function(section_id) {
+		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('scheme');
+	}
+	o.onchange = function(ev, section_id, value) {
+		const UIEl = this.section.getUIElement(section_id, 'uri');
+
+		let newvalue = new PeerURI(UIEl.getValue()).setKey('scheme', value).toString();
+
+		UIEl.node.previousSibling.innerText = newvalue;
+		UIEl.setValue(newvalue);
+	}
+	o.write = function() {};
+	o.modalonly = true;
+
+	o = s.option(form.Value, 'host', _('Address'));
+	o.datatype = 'host';
+	o.load = function(section_id) {
+		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('hostname').replace(/^\[/, '').replace(/\]$/, '');
+	}
+	o.onchange = function(ev, section_id, value) {
+		const UIEl = this.section.getUIElement(section_id, 'uri');
+
+		let newvalue = new PeerURI(UIEl.getValue()).setKey('hostname', value.match(':') ? `[${value}]` : value).toString();
+
+		UIEl.node.previousSibling.innerText = newvalue;
+		UIEl.setValue(newvalue);
+	}
+	o.write = function() {};
+	o.rmempty = false;
+	o.modalonly = true;
+
+	o = s.option(form.Value, 'port', _('Port'));
+	o.datatype = 'port';
+	o.load = function(section_id) {
+		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('port');
+	}
+	o.onchange = function(ev, section_id, value) {
+		const UIEl = this.section.getUIElement(section_id, 'uri');
+
+		let newvalue = new PeerURI(UIEl.getValue()).setKey('port', value).toString();
+
+		UIEl.node.previousSibling.innerText = newvalue;
+		UIEl.setValue(newvalue);
+	}
+	o.validate = function(section_id, value) {
+		const widget = this.getUIElement(section_id).node.querySelector('input');
+		const scheme = this.section.getOption('scheme').formvalue(section_id);
+
+		// Force disabled
+		if (['txt', 'srv'].includes(scheme)) {
+			this.onchange(null, section_id, '');
+			widget.value = '';
+			widget.disabled = true;
+		} else {
+			widget.removeAttribute('disabled');
+			if (!value)
+				return _('Expecting: %s').format(_('non-empty value'));
+		}
+
+		return true;
+	}
+	o.write = function() {};
+	o.modalonly = true;
+
+	o = s.option(form.Value, 'path', _('Path'));
+	o.placeholder = '/';
+	o.load = function(section_id) {
+		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('pathname');
+	}
+	o.onchange = function(ev, section_id, value) {
+		const UIEl = this.section.getUIElement(section_id, 'uri');
+
+		let newvalue = new PeerURI(UIEl.getValue()).setKey('pathname', value).toString();
+
+		UIEl.node.previousSibling.innerText = newvalue;
+		UIEl.setValue(newvalue);
+	}
+	o.validate = function(section_id, value) {
+		const widget = this.getUIElement(section_id).node.querySelector('input');
+		const scheme = this.section.getOption('scheme').formvalue(section_id);
+
+		// Force disabled
+		if (['ws', 'wss', 'http', 'https'].includes(scheme)) {
+			widget.removeAttribute('disabled');
+			if (!value)
+				return _('Expecting: %s').format(_('non-empty value'));
+		} else {
+			this.onchange(null, section_id, '');
+			widget.value = '';
+			widget.disabled = true;
+		}
+
+		return true;
+	}
+	o.write = function() {};
+	o.modalonly = true;
+}
+
 function validateTotalPeers(section_id, value) {
 	const peers = this.section.getOption('peers').formvalue(section_id);
 	const external_node = this.section.getOption('external_node').formvalue(section_id);
@@ -392,112 +503,7 @@ return view.extend({
 			return this.cfgvalue(section_id) ? _('🔑') : _('none');
 		}
 
-		so = ss.option(form.DummyValue, 'uri', _('URI'));
-		so.write = form.AbstractValue.prototype.write;
-		so.remove = form.AbstractValue.prototype.remove;
-		so.editable = true;
-
-		so = ss.option(ez.GroupListValue, 'scheme', _('Scheme'));
-		so.default = ez.peers_type[0].types[0][0];
-		for (const {label, types} of ez.peers_type) {
-			types.forEach((res) => so.value.call(so, res, label));
-		}
-		so.load = function(section_id) {
-			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('scheme');
-		}
-		so.onchange = function(ev, section_id, value) {
-			const UIEl = this.section.getUIElement(section_id, 'uri');
-
-			let newvalue = new PeerURI(UIEl.getValue()).setKey('scheme', value).toString();
-
-			UIEl.node.previousSibling.innerText = newvalue;
-			UIEl.setValue(newvalue);
-		}
-		so.write = function() {};
-		so.modalonly = true;
-
-		so = ss.option(form.Value, 'host', _('Address'));
-		so.datatype = 'host';
-		so.load = function(section_id) {
-			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('hostname').replace(/^\[/, '').replace(/\]$/, '');
-		}
-		so.onchange = function(ev, section_id, value) {
-			const UIEl = this.section.getUIElement(section_id, 'uri');
-
-			let newvalue = new PeerURI(UIEl.getValue()).setKey('hostname', value.match(':') ? `[${value}]` : value).toString();
-
-			UIEl.node.previousSibling.innerText = newvalue;
-			UIEl.setValue(newvalue);
-		}
-		so.write = function() {};
-		so.rmempty = false;
-		so.modalonly = true;
-
-		so = ss.option(form.Value, 'port', _('Port'));
-		so.datatype = 'port';
-		so.load = function(section_id) {
-			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('port');
-		}
-		so.onchange = function(ev, section_id, value) {
-			const UIEl = this.section.getUIElement(section_id, 'uri');
-
-			let newvalue = new PeerURI(UIEl.getValue()).setKey('port', value).toString();
-
-			UIEl.node.previousSibling.innerText = newvalue;
-			UIEl.setValue(newvalue);
-		}
-		so.validate = function(section_id, value) {
-			const widget = this.getUIElement(section_id).node.querySelector('input');
-			const scheme = this.section.getOption('scheme').formvalue(section_id);
-
-			// Force disabled
-			if (['txt', 'srv'].includes(scheme)) {
-				this.onchange(null, section_id, '');
-				widget.value = '';
-				widget.disabled = true;
-			} else {
-				widget.removeAttribute('disabled');
-				if (!value)
-					return _('Expecting: %s').format(_('non-empty value'));
-			}
-
-			return true;
-		}
-		so.write = function() {};
-		so.modalonly = true;
-
-		so = ss.option(form.Value, 'path', _('Path'));
-		so.placeholder = '/';
-		so.load = function(section_id) {
-			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('pathname');
-		}
-		so.onchange = function(ev, section_id, value) {
-			const UIEl = this.section.getUIElement(section_id, 'uri');
-
-			let newvalue = new PeerURI(UIEl.getValue()).setKey('pathname', value).toString();
-
-			UIEl.node.previousSibling.innerText = newvalue;
-			UIEl.setValue(newvalue);
-		}
-		so.validate = function(section_id, value) {
-			const widget = this.getUIElement(section_id).node.querySelector('input');
-			const scheme = this.section.getOption('scheme').formvalue(section_id);
-
-			// Force disabled
-			if (['ws', 'wss', 'http', 'https'].includes(scheme)) {
-				widget.removeAttribute('disabled');
-				if (!value)
-					return _('Expecting: %s').format(_('non-empty value'));
-			} else {
-				this.onchange(null, section_id, '');
-				widget.value = '';
-				widget.disabled = true;
-			}
-
-			return true;
-		}
-		so.write = function() {};
-		so.modalonly = true;
+		renderURIs(ss, data[0]);
 		/* Peers END */
 
 		return m.render();
