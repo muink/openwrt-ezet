@@ -2,7 +2,8 @@
 
 'use strict';
 
-import { access, lstat, popen, readfile, writefile } from 'fs';
+import { access, glob, lstat, popen, readfile, writefile } from 'fs';
+import * as digest from 'digest';
 import {
 	shellQuote, isEmpty,
 	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR
@@ -41,6 +42,59 @@ const methods = {
 			features.has_tun = hasKernelModule('tun.ko') || access('/etc/modules.d/30-tun');
 
 			return features;
+		}
+	},
+
+	get_host_info: {
+		call: function() {
+			let fd;
+
+			const SALT = 'openwrt-ezet-machine-id:';
+
+			const macs = [];
+			for (let path in (glob('/sys/class/net/*') ?? [])) {
+				if (!access(`${path}/device`))
+					continue;
+
+				let mac = readfile(`${path}/address`);
+
+				if (mac == null)
+					continue;
+
+				mac = replace(mac, /[\r\n:-]/g, '');
+				mac = lc(mac);
+
+				if (!length(mac) || mac == '000000000000')
+					continue;
+
+				push(macs, mac);
+			}
+
+			const hash = digest.sha1(SALT + join(':', uniq(sort(macs))));
+			if (type(hash) != 'string' || length(hash) < 32)
+				return { machine_id: trim(readfile('/proc/sys/kernel/random/uuid')),
+					hostname: trim(readfile('/proc/sys/kernel/hostname')) };
+
+			function uuid_from_hash(u, version) {
+				// RFC UUID variant: 10xx
+				let variant = int(substr(u, 16, 1), 16) % 4;
+
+				let h = substr(u, 0, 12) +
+					sprintf("%01x", version) + substr(u, 13, 3) +
+					substr('89ab', variant, 1) +
+					substr(u, 17, 15);
+
+				return sprintf('%s-%s-%s-%s-%s',
+					substr(h, 0, 8),
+					substr(h, 8, 4),
+					substr(h, 12, 4),
+					substr(h, 16, 4),
+					substr(h, 20, 12)
+				);
+			}
+
+			return { machine_id: uuid_from_hash(hash, 5),
+				hostname: trim(readfile('/proc/sys/kernel/hostname')) };
 		}
 	},
 
