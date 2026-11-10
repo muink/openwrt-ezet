@@ -32,6 +32,36 @@ const stubValidator = {
 	}
 };
 
+class PeerURI {
+	constructor(uri) {
+		this.input = uri || `${ez.peers_type[0].types[0][0]}://`;
+		this.url = this.input.split(':');
+		this.scheme = this.url.shift();
+		this.url = new URL('tcp:' + this.url.join(':'));
+		this.urlkeys = ['username', 'password', 'hostname', 'port', 'pathname'];
+	}
+
+	getKey(key, value) {
+		if (this.urlkeys.includes(key))
+			return this.url[key];
+		else
+			return this[key];
+	}
+
+	setKey(key, value) {
+		if (this.urlkeys.includes(key))
+			this.url[key] = value;
+		else
+			this[key] = value;
+
+		return this;
+	}
+
+	toString() {
+		return this.scheme + ':' + this.url.toString().replace(/^[^:]*:/, '');
+	}
+}
+
 function ipv6CidrToRange(cidr) {
 	const [addr, prefix] = cidr.split('/');
 	const words = validation.parseIPv6(addr);
@@ -59,6 +89,17 @@ function ipv6CidrToRange(cidr) {
 function ipv6RangeContains(outer, inner) {
 	return stubValidator.apply('iprange6', `${outer[0]}-${inner[0]}`) &&
 		stubValidator.apply('iprange6', `${inner[1]}-${outer[1]}`);
+}
+
+function validateTotalPeers(section_id, value) {
+	const peers = this.section.getOption('peers').formvalue(section_id);
+	const external_node = this.section.getOption('external_node').formvalue(section_id);
+	value = peers.concat(external_node).filter(Boolean);
+
+	if (value.length == 0)
+		return _('Expecting: %s').format(_('least one peer required'));
+
+	return true;
 }
 
 return view.extend({
@@ -214,6 +255,29 @@ return view.extend({
 			_('Auto-obtain a IPv6 GUA from a peer that shares its IPv6 subnet.'));
 		so.default = so.disabled;
 
+		so = ss.taboption('field_Base', form.MultiValue, 'peers', _('Trusted peers'));
+		so.value('', _('-- Please choose --'));
+		so.load = function(section_id) {
+			return ez.loadLabel.call(this, [
+				['', _('-- Please choose --')],
+				...ez.loadLabelValues(this.config, 'peer', {type: 'private'})
+			], section_id);
+		}
+		so.validate = validateTotalPeers;
+		so.modalonly = true;
+
+		so = ss.taboption('field_Base', form.ListValue, 'external_node', _('Public shared node'),
+			_('Use a public shared node to discover peers.'));
+		so.value('', _('none'));
+		so.load = function(section_id) {
+			return ez.loadLabel.call(this, [
+				['', _('none')],
+				...ez.loadLabelValues(this.config, 'peer', {type: 'public'})
+			], section_id);
+		}
+		so.validate = validateTotalPeers;
+		so.modalonly = true;
+
 		/** Secure fields **/
 		so = ss.taboption('field_secure', ez.GenValue, 'local_private_key', _('Client private key'),
 			_('Base64 encoded X25519 private key.'));
@@ -292,6 +356,149 @@ return view.extend({
 		so.depends('ipv6_public_addr_provider', '1');
 		so.modalonly = true;
 		/* General END */
+
+		/* Peers START */
+		s.tab('peers', _('Peers'));
+
+		/* Peers grid */
+		o = s.taboption('peers', form.SectionValue, '_peer', ez.GridSection, 'peer', null);
+		ss = o.subsection;
+		ss.addremove = true;
+		ss.rowcolors = true;
+		ss.sortable = true;
+		ss.nodescriptions = true;
+		ss.ez_modaltitle = [ _('Peer'), _('Add a peer') ];
+		ss.ez_prefmt = ez.glossary[ss.sectiontype].prefmt;
+		ss.ez_lowcase_only = false;
+
+		so = ss.option(form.Value, 'label', _('Label'));
+		so.load = ez.loadDefaultLabel;
+		so.validate = ez.validateUniqueValue;
+		so.modalonly = true;
+
+		so = ss.option(form.Flag, 'enabled', _('Enable'));
+		so.default = so.enabled;
+		so.editable = true;
+
+		so = ss.option(form.ListValue, 'type', _('Type'));
+		so.value('private', _('Private trusted'));
+		so.value('public', _('Publicly shared'));
+		so.textvalue = ez.textvalue2Value;
+
+		so = ss.option(form.Value, 'peer_public_key', _('Peer public key'),
+			_('Base64 encoded X25519 public key.'));
+		so.validate = L.bind(ez.validateBase64Key, so, 44);
+		so.textvalue = function(section_id) {
+			return this.cfgvalue(section_id) ? _('🔑') : _('none');
+		}
+
+		so = ss.option(form.DummyValue, 'uri', _('URI'));
+		so.write = form.AbstractValue.prototype.write;
+		so.remove = form.AbstractValue.prototype.remove;
+		so.editable = true;
+
+		so = ss.option(ez.GroupListValue, 'scheme', _('Scheme'));
+		so.default = ez.peers_type[0].types[0][0];
+		for (const {label, types} of ez.peers_type) {
+			types.forEach((res) => so.value.call(so, res, label));
+		}
+		so.load = function(section_id) {
+			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('scheme');
+		}
+		so.onchange = function(ev, section_id, value) {
+			const UIEl = this.section.getUIElement(section_id, 'uri');
+
+			let newvalue = new PeerURI(UIEl.getValue()).setKey('scheme', value).toString();
+
+			UIEl.node.previousSibling.innerText = newvalue;
+			UIEl.setValue(newvalue);
+		}
+		so.write = function() {};
+		so.modalonly = true;
+
+		so = ss.option(form.Value, 'host', _('Address'));
+		so.datatype = 'host';
+		so.load = function(section_id) {
+			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('hostname').replace(/^\[/, '').replace(/\]$/, '');
+		}
+		so.onchange = function(ev, section_id, value) {
+			const UIEl = this.section.getUIElement(section_id, 'uri');
+
+			let newvalue = new PeerURI(UIEl.getValue()).setKey('hostname', value.match(':') ? `[${value}]` : value).toString();
+
+			UIEl.node.previousSibling.innerText = newvalue;
+			UIEl.setValue(newvalue);
+		}
+		so.write = function() {};
+		so.rmempty = false;
+		so.modalonly = true;
+
+		so = ss.option(form.Value, 'port', _('Port'));
+		so.datatype = 'port';
+		so.load = function(section_id) {
+			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('port');
+		}
+		so.onchange = function(ev, section_id, value) {
+			const UIEl = this.section.getUIElement(section_id, 'uri');
+
+			let newvalue = new PeerURI(UIEl.getValue()).setKey('port', value).toString();
+
+			UIEl.node.previousSibling.innerText = newvalue;
+			UIEl.setValue(newvalue);
+		}
+		so.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const scheme = this.section.getOption('scheme').formvalue(section_id);
+
+			// Force disabled
+			if (['txt', 'srv'].includes(scheme)) {
+				this.onchange(null, section_id, '');
+				widget.value = '';
+				widget.disabled = true;
+			} else {
+				widget.removeAttribute('disabled');
+				if (!value)
+					return _('Expecting: %s').format(_('non-empty value'));
+			}
+
+			return true;
+		}
+		so.write = function() {};
+		so.modalonly = true;
+
+		so = ss.option(form.Value, 'path', _('Path'));
+		so.placeholder = '/';
+		so.load = function(section_id) {
+			return new PeerURI(uci.get(data[0], section_id, 'uri')).getKey('pathname');
+		}
+		so.onchange = function(ev, section_id, value) {
+			const UIEl = this.section.getUIElement(section_id, 'uri');
+
+			let newvalue = new PeerURI(UIEl.getValue()).setKey('pathname', value).toString();
+
+			UIEl.node.previousSibling.innerText = newvalue;
+			UIEl.setValue(newvalue);
+		}
+		so.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const scheme = this.section.getOption('scheme').formvalue(section_id);
+
+			// Force disabled
+			if (['ws', 'wss', 'http', 'https'].includes(scheme)) {
+				widget.removeAttribute('disabled');
+				if (!value)
+					return _('Expecting: %s').format(_('non-empty value'));
+			} else {
+				this.onchange(null, section_id, '');
+				widget.value = '';
+				widget.disabled = true;
+			}
+
+			return true;
+		}
+		so.write = function() {};
+		so.modalonly = true;
+		/* Peers END */
 
 		return m.render();
 	}

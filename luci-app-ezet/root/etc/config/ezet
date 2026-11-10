@@ -12,4 +12,20 @@ config instance 'instance_easytier'
 	option label 'easytier'
 	option network_name 'easytier'
 	option network_secret ''
+	option external_node 'peer_DreamLife'
+
+config peer 'peer_Official'
+	option label 'Official'
+	option type 'public'
+	option uri 'tcp://public.easytier.top:11010'
+
+config peer 'peer_DreamLife'
+	option label 'DreamLife'
+	option type 'public'
+	option uri 'tcp://dreamlife.indevs.in:11010'
+
+config peer 'peer_WindMC'
+	option label 'WindMC'
+	option type 'public'
+	option uri 'tcp://161.33.207.13:51010'
 

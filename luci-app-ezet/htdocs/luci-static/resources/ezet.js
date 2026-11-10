@@ -33,7 +33,34 @@ const glossary = {
 	instance: {
 		prefmt: 'instance_%s',
 	},
+	peer: {
+		prefmt: 'peer_%s',
+	},
 };
+
+const peers_type = [
+	{
+		label: _('Direct transfer protocol'),
+		types: [
+			['tcp', _('TCP')],
+			['udp', _('UDP')],
+			['faketcp', _('FakeTCP') + ' - ' + _('FakeTCP')],
+			['ws', _('WebSocket') + ' - ' + _('TCP')],
+			['wss', _('WebSocket SSL') + ' - ' + _('TCP')],
+			['wg', _('WireGuard') + ' - ' + _('UDP')],
+			['quic', _('QUIC') + ' - ' + _('UDP')],
+		]
+	},
+	{
+		label: _('Service discovery URI'),
+		types: [
+			['txt', _('DNS TXT record')],
+			['srv', _('DNS SRV record')],
+			['http', _('HTTP 302 OR response')],
+			['https', _('HTTPS same as HTTP')],
+		]
+	}
+];
 
 /* Prototype */
 const CBIGridSection = form.GridSection.extend({
@@ -82,6 +109,40 @@ const CBIGridSection = form.GridSection.extend({
 		const prefmt = this.ez_prefmt || '%s';
 
 		return form.GridSection.prototype.handleAdd.call(this, ev, prefmt.format(name));
+	}
+});
+
+const CBIGroupListValue = form.ListValue.extend({
+	__name__: 'CBI.GroupListValue',
+
+	renderWidget(section_id, option_index, cfgvalue) {
+		const frameEl = form.ListValue.prototype.renderWidget.apply(this, arguments);
+		const select = frameEl.querySelector('select');
+		const options = Array.from(select.options);
+
+		Object.keys(this.grplist).forEach((label) => {
+			const groupEl = E('optgroup', {label: label}, []);
+			for (const option of options)
+				if (this.grplist[label].includes(option.value))
+					groupEl.appendChild(option);
+			select.appendChild(groupEl);
+		});
+
+		select.value = (cfgvalue != null) ? cfgvalue : this.default;
+		return frameEl;
+	},
+
+	value(key, val) {
+		this.keylist ??= [];
+		this.vallist ??= [];
+		this.grplist ??= {};
+
+		if (Array.isArray(key)) {
+			this.grplist[val] ??= [];
+			this.grplist[val].push(key[0]);
+			this.super('value', ...key);
+		} else
+			this.super('value', key, val);
 	}
 });
 
@@ -207,6 +268,38 @@ function loadModalTitle(title, addtitle, section_id) {
 	return label ? title + ' » ' + label : addtitle;
 }
 
+function loadLabel(preadds, section_id) {
+	delete this.keylist;
+	delete this.vallist;
+
+	for (const arr of preadds || [])
+		this.value(...arr);
+
+	return this.super('load', section_id);
+}
+
+function loadLabelValues(uciconfig, sectiontype, options = {}) {
+	const values = [];
+
+	switch (sectiontype) {
+		case 'peer':
+			uci.sections(uciconfig, sectiontype, (res) => {
+				if (
+					res.enabled !== '0' &&
+					(!options.type ||
+					  options.type === res.type)
+				) {
+					values.push([res['.name'], (res.peer_public_key ? _('🔒') : '') + res.label]);
+				}
+			});
+			break;
+		default:
+			break;
+	}
+
+	return values;
+}
+
 function handleGenKey(section_id, option) {
 	const type = this.section.getOption('type')?.formvalue(section_id);
 	const widget = L.bind(function(option) {
@@ -252,6 +345,13 @@ function handleGenKey(section_id, option) {
 
 		return widget(option).value = password;
 	}
+}
+
+function textvalue2Value(section_id) {
+	let cval = this.cfgvalue(section_id);
+	let i = this.keylist.indexOf(cval);
+
+	return this.vallist[i] ?? cval;
 }
 
 function validateUUID(section_id, value) {
@@ -326,9 +426,11 @@ return baseclass.extend({
 	monospacefonts,
 	log_levels,
 	glossary,
+	peers_type,
 
 	/* Prototype */
 	GridSection: CBIGridSection,
+	GroupListValue: CBIGroupListValue,
 	TextValue: CBITextValue,
 	GenValue: CBIGenValue,
 	GenText: CBIGenText,
@@ -339,8 +441,11 @@ return baseclass.extend({
 	// load
 	loadDefaultLabel,
 	loadModalTitle,
+	loadLabel,
+	loadLabelValues,
 	// render
 	handleGenKey,
+	textvalue2Value,
 	// validate
 	validateUUID,
 	validateUrl,
