@@ -3,7 +3,6 @@
 'require rpc';
 'require uci';
 'require view';
-'require validation';
 
 'require ezet as ez';
 
@@ -18,19 +17,6 @@ const callGetV6GUAPrefix = rpc.declare({
 	method: 'detect_ipv6_gua_prefix',
 	expect: { '': {} }
 });
-
-const stubValidator = {
-	factory: validation,
-	apply(type, value, args) {
-		if (value != null)
-			this.value = value;
-
-		return validation.types[type].apply(this, args || []);
-	},
-	assert(condition) {
-		return !!condition;
-	}
-};
 
 class PeerURI {
 	constructor(uri) {
@@ -60,35 +46,6 @@ class PeerURI {
 	toString() {
 		return this.scheme + ':' + this.url.toString().replace(/^[^:]*:/, '');
 	}
-}
-
-function ipv6CidrToRange(cidr) {
-	const [addr, prefix] = cidr.split('/');
-	const words = validation.parseIPv6(addr);
-
-	const start = [];
-	const end = [];
-
-	for (let i = 0; i < 8; i++) {
-		const bits = prefix - i * 16;
-		const mask = bits <= 0 ? 0 :
-			bits >= 16 ? 0xffff :
-			(0xffff << (16 - bits)) & 0xffff;
-
-		start.push(words[i] & mask);
-		end.push((words[i] & mask) | (0xffff ^ mask));
-	}
-
-	const format = words => words
-		.map(word => word.toString(16))
-		.join(':');
-
-	return [format(start), format(end)];
-}
-
-function ipv6RangeContains(outer, inner) {
-	return stubValidator.apply('iprange6', `${outer[0]}-${inner[0]}`) &&
-		stubValidator.apply('iprange6', `${inner[1]}-${outer[1]}`);
 }
 
 function renderURIs(s, uciconfig, isServer = false) {
@@ -431,10 +388,10 @@ return view.extend({
 			const delegated = ip6guaPrefix.result.delegated || [];
 			so.placeholder = pd;
 			so.onchange = function(ev, section_id, value) {
-				if (stubValidator.apply('cidr6', value)) {
+				if (ez.stubValidator.apply('cidr6', value)) {
 					const UIEl = this.getUIElement(section_id);
 
-					const fmtValue = `${ipv6CidrToRange(value)[0].replace(/(:0)+/, '::')}/${value.split('/')[1]}`;
+					const fmtValue = `${ez.ipv6CidrToRange(value)[0].replace(/(:0)+/, '::')}/${value.split('/')[1]}`;
 					UIEl.setValue(fmtValue);
 
 					this.super('validate', section_id, fmtValue);
@@ -447,10 +404,10 @@ return view.extend({
 				if (!value)
 					return true;
 
-				const outer = ipv6CidrToRange(pd);
-				const inner = ipv6CidrToRange(value);
+				const outer = ez.ipv6CidrToRange(pd);
+				const inner = ez.ipv6CidrToRange(value);
 
-				if (!ipv6RangeContains(outer, inner))
+				if (!ez.ipv6RangeContains(outer, inner))
 					return _('Expecting: %s').format(_('IPv6 subnet within the %s range').format(pd));
 
 				for (let route of delegated)
@@ -574,10 +531,10 @@ return view.extend({
 			if (value === 'mapped_listeners') {
 				const host = this.section.getOption('host').formvalue(section_id);
 
-				if (stubValidator.apply('hostname', host) === true)
+				if (ez.stubValidator.apply('hostname', host) === true)
 					return true;
 
-				if (stubValidator.apply('ip4addr', host) === true) {
+				if (ez.stubValidator.apply('ip4addr', host) === true) {
 					if (ez.validateIPv4Privnet.call(this, section_id, host) === true)
 						return _('Expecting: %s').format(_('valid IPv4 global routable address'));
 					else

@@ -5,6 +5,7 @@
 'require rpc';
 'require uci';
 'require ui';
+'require validation';
 
 /* Member */
 const EZ_DIR = "/etc/ezet";
@@ -233,6 +234,19 @@ const CBICopyValue = form.Value.extend({
 	}
 });
 
+const stubValidator = {
+	factory: validation,
+	apply(type, value, args) {
+		if (value != null)
+			this.value = value;
+
+		return validation.types[type].apply(this, args || []);
+	},
+	assert(condition) {
+		return !!condition;
+	}
+};
+
 /* Method */
 function generateRand(type, length) {
 	let byteArr;
@@ -284,6 +298,35 @@ function getServiceStatus(instance) {
 			} catch (e) {}
 			return isRunning;
 		});
+}
+
+function ipv6CidrToRange(cidr) {
+	const [addr, prefix] = cidr.split('/');
+	const words = validation.parseIPv6(addr);
+
+	const start = [];
+	const end = [];
+
+	for (let i = 0; i < 8; i++) {
+		const bits = prefix - i * 16;
+		const mask = bits <= 0 ? 0 :
+			bits >= 16 ? 0xffff :
+			(0xffff << (16 - bits)) & 0xffff;
+
+		start.push(words[i] & mask);
+		end.push((words[i] & mask) | (0xffff ^ mask));
+	}
+
+	const format = words => words
+		.map(word => word.toString(16))
+		.join(':');
+
+	return [format(start), format(end)];
+}
+
+function ipv6RangeContains(outer, inner) {
+	return stubValidator.apply('iprange6', `${outer[0]}-${inner[0]}`) &&
+		stubValidator.apply('iprange6', `${inner[1]}-${outer[1]}`);
 }
 
 /* thanks to homeproxy */
@@ -494,11 +537,14 @@ return baseclass.extend({
 	GenValue: CBIGenValue,
 	GenText: CBIGenText,
 	CopyValue: CBICopyValue,
+	stubValidator,
 
 	/* Method */
 	generateRand,
 	getFeatures,
 	getServiceStatus,
+	ipv6CidrToRange,
+	ipv6RangeContains,
 	// load
 	loadDefaultLabel,
 	loadModalTitle,
