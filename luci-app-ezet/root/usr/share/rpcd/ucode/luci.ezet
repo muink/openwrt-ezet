@@ -14,6 +14,49 @@ function hasKernelModule(kmod) {
 }
 
 const methods = {
+	keygen: {
+		args: { type: 'type', params: 'params' },
+		call: function(req) {
+			const type = req.args?.type;
+
+			if (!(type in ['wg-keypair', 'credential']))
+				return { result: false, error: 'illegal type' };
+
+			let cmd = '';
+			switch (type) {
+				case 'wg-keypair':
+					cmd = 'set -e;' +
+						'priv="$(openssl genpkey -algorithm X25519)";' +
+						'echo "PrivateKey: $(echo "$priv" | openssl pkey -outform DER | tail -c 32 | base64 | tr -d \'\r\n\')";' +
+						'echo "PublicKey: $(echo "$priv" | openssl pkey -pubout -outform DER | tail -c 32 | base64 | tr -d \'\r\n\')";';
+					break;
+				case 'credential':
+					return { result: false, error: 'not implemented' };
+					break;
+			}
+
+			let result = {};
+
+			const fd = popen(`${cmd} ${shellQuote(req.args.params ?? '')}`);
+			if (fd) {
+				for (let line = fd.read('line'); length(line); line = fd.read('line')) {
+					if (type in ['wg-keypair']) {
+						let priv = match(trim(line), /PrivateKey: (.*)/);
+						if (priv)
+							result.private_key = priv[1];
+						let pub = match(trim(line), /PublicKey: (.*)/);
+						if (pub)
+							result.public_key = pub[1];
+					}
+				}
+
+				fd.close();
+			}
+
+			return { result };
+		}
+	},
+
 	get_features: {
 		call: function() {
 			let features = {};

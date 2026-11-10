@@ -29,6 +29,231 @@ const log_levels = [
 	['trace', _('Trace')]
 ];
 
+const glossary = {
+	instance: {
+		prefmt: 'instance_%s',
+	},
+};
+
+/* Prototype */
+const CBIGridSection = form.GridSection.extend({
+	modaltitle(/* ... */) {
+		return loadModalTitle.call(this, ...this.ez_modaltitle || [null,null], ...arguments);
+	},
+
+	sectiontitle(/* ... */) {
+		return loadDefaultLabel.apply(this, arguments);
+	},
+
+	renderSectionAdd(extra_class) {
+		const prefmt = this.ez_prefmt || '%s';
+		const LC = this.ez_lowcase_only;
+
+		let el = form.GridSection.prototype.renderSectionAdd.call(this, extra_class),
+			nameEl = el.querySelector('.cbi-section-create-name');
+
+		nameEl.placeholder = _('Specify a ID');
+
+		ui.addValidator(nameEl, 'uciname', true, (v) => {
+			let button = el.querySelector('.cbi-section-create > .cbi-button-add');
+
+			if (!v) {
+				button.disabled = true;
+				return true;
+			} else if (LC && (v !== v.toLowerCase())) {
+				button.disabled = true;
+				return _('Expecting: %s').format(_('Lowercase only'));
+			} else if (uci.get(this.config, v)) {
+				button.disabled = true;
+				return _('Expecting: %s').format(_('unique UCI identifier'));
+			} else if (uci.get(this.config, prefmt.format(v))) {
+				button.disabled = true;
+				return _('Expecting: %s').format(_('unique identifier'));
+			} else {
+				button.removeAttribute('disabled');
+				return true;
+			}
+		}, 'blur', 'keyup');
+
+		return el;
+	},
+
+	handleAdd(ev, name) {
+		const prefmt = this.ez_prefmt || '%s';
+
+		return form.GridSection.prototype.handleAdd.call(this, ev, prefmt.format(name));
+	}
+});
+
+const CBITextValue = form.TextValue.extend({
+	renderWidget(/* ... */) {
+		let frameEl = form.TextValue.prototype.renderWidget.apply(this, arguments);
+
+		frameEl.querySelector('textarea').style.fontFamily = monospacefonts.join(',');
+
+		return frameEl;
+	}
+});
+
+const CBIGenValue = form.Value.extend({
+	__name__: 'CBI.GenValue',
+
+	renderWidget(section_id, option_index, cfgvalue) {
+		let node = form.Value.prototype.renderWidget.apply(this, arguments);
+
+		if (!this.password)
+			node.classList.add('control-group');
+
+		if (this.section.section) // modalonly
+			(node.querySelector('.control-group') || node).appendChild(E('button', {
+				class: 'cbi-button cbi-button-add',
+				title: _('Generate'),
+				click: ui.createHandlerFn(this, handleGenKey, section_id, this.ez_options || this.option)
+			}, [ _('Generate') ]));
+
+		return node;
+	}
+});
+
+const CBIGenText = CBITextValue.extend({
+	__name__: 'CBI.GenText',
+
+	renderWidget(section_id, option_index, cfgvalue) {
+		let node = CBITextValue.prototype.renderWidget.apply(this, arguments);
+
+		if (this.section.section) // modalonly
+			(node.querySelector('.control-group') || node).appendChild(E('button', {
+				class: 'cbi-button cbi-button-add',
+				title: _('Generate'),
+				click: ui.createHandlerFn(this, handleGenKey, section_id, this.ez_options || this.option)
+			}, [ _('Generate') ]));
+
+		return node;
+	}
+});
+
+const CBICopyValue = form.Value.extend({
+	__name__: 'CBI.CopyValue',
+
+	readonly: true,
+
+	renderWidget(section_id, option_index, cfgvalue) {
+		let node = form.Value.prototype.renderWidget.apply(this, arguments);
+
+		node.classList.add('control-group');
+
+		if (this.section.section) // modalonly
+			node.appendChild(E('button', {
+				class: 'cbi-button cbi-button-add',
+				click: ui.createHandlerFn(this, async (section_id) => {
+					try {
+						await navigator.clipboard.writeText(this.formvalue(section_id));
+						console.log('Content copied to clipboard!');
+					} catch (e) {
+						console.error('Failed to copy: ', e);
+					}
+					/* Deprecated
+					let inputEl = document.getElementById(this.cbid(section_id)).querySelector('input');
+					inputEl.select();
+					document.execCommand("copy");
+					inputEl.blur();
+					*/
+					return alert(_('Content copied to clipboard!'));
+				}, section_id)
+			}, [ _('Copy') ]));
+
+		return node;
+	}
+});
+
+/* Method */
+function generateRand(type, length) {
+	let byteArr;
+	if (['base64', 'hex'].includes(type))
+		byteArr = crypto.getRandomValues(new Uint8Array(length));
+	switch (type) {
+		case 'base64':
+			/* Thanks to https://stackoverflow.com/questions/9267899 */
+			return btoa(String.fromCharCode.apply(null, byteArr));
+		case 'hex':
+			return Array.from(byteArr, (byte) =>
+				(byte & 255).toString(16).padStart(2, '0')
+			).join('');
+		case 'uuid':
+			/* Thanks to https://stackoverflow.com/a/2117523 */
+			return (location.protocol === 'https:') ? crypto.randomUUID() :
+			([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, (c) =>
+				(c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)
+			);
+		default:
+			return null;
+	};
+}
+
+/* thanks to homeproxy */
+function loadDefaultLabel(section_id) {
+	const label = uci.get(this.config, section_id, 'label');
+	if (label) {
+		return label;
+	} else {
+		uci.set(this.config, section_id, 'label', section_id);
+		return section_id;
+	}
+}
+
+/* thanks to homeproxy */
+function loadModalTitle(title, addtitle, section_id) {
+	const label = uci.get(this.config, section_id, 'label');
+	return label ? title + ' » ' + label : addtitle;
+}
+
+function handleGenKey(section_id, option) {
+	const type = this.section.getOption('type')?.formvalue(section_id);
+	const widget = L.bind(function(option) {
+		return this.map.findElement('id', 'widget.' + this.cbid(section_id).replace(/\.[^\.]+$/, '.') + option);
+	}, this);
+
+	const callKeygen = rpc.declare({
+		object: 'luci.ezet',
+		method: 'keygen',
+		params: ['type', 'params'],
+		expect: { '': {} }
+	});
+
+	if (typeof option === 'object') {
+		return callKeygen(option.type, option.params).then((res) => {
+			if (res.result)
+				option.callback.call(this, res.result).forEach(([k, v]) => {
+					widget(k).value = v ?? '';
+				});
+			else
+				ui.addNotification(null, E('p', _('Failed to generate %s, error: %s.').format(type, res.error)), 'error');
+		});
+	} else {
+		let password, required_method;
+
+		if (option === 'uuid' || option.match(/_uuid/))
+			required_method = 'uuid';
+
+		switch (required_method) {
+			/* NONE */
+			case 'none':
+				password = '';
+				break;
+			/* UUID */
+			case 'uuid':
+				password = generateRand('uuid');
+				break;
+			/* DEFAULT */
+			default:
+				password = generateRand('hex', 32/2);
+				break;
+		}
+
+		return widget(option).value = password;
+	}
+}
+
 function validateUUID(section_id, value) {
 	if (!value)
 		return true;
@@ -54,12 +279,72 @@ function validateUrl(section_id, value) {
 	return true;
 }
 
+function validateBase64Key(length, section_id, value) {
+	/* Thanks to luci-proto-wireguard */
+	if (value) {
+		if (value.length !== length || !value.match(/^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?$/) || value[length-1] !== '=')
+			return _('Expecting: %s').format(_('valid base64 key with %d characters').format(length));
+	} else if (this.rmempty === false || (this.optional ?? true) !== false)
+		return _('Expecting: %s').format(_('non-empty value'));
+
+	return true;
+}
+
+function validateIPv4Privnet(section_id, value) {
+	if (!value)
+		return true;
+
+	const result = stubValidator.apply('ipmask4', value);
+	if (result !== true)
+		return result;
+
+	if (!value.match(/^(10|172\.(3[01]|2\d|1[6-9])|192\.168)\./))
+		return _('Expecting: %s').format(_('valid IPv4 private network address'));
+
+	return true;
+}
+
+function validateUniqueValue(section_id, value) {
+	if (!value)
+		return _('Expecting: %s').format(_('non-empty value'));
+
+	let duplicate = false;
+	uci.sections(this.config, this.section.sectiontype, (res) => {
+		if (res['.name'] !== section_id)
+			if (res[this.option] === value)
+				duplicate = true;
+	});
+	if (duplicate)
+		return _('Expecting: %s').format(_('unique value'));
+
+	return true;
+}
+
 return baseclass.extend({
 	/* Member */
 	EZ_DIR,
 	monospacefonts,
 	log_levels,
+	glossary,
+
+	/* Prototype */
+	GridSection: CBIGridSection,
+	TextValue: CBITextValue,
+	GenValue: CBIGenValue,
+	GenText: CBIGenText,
+	CopyValue: CBICopyValue,
+
+	/* Method */
+	generateRand,
+	// load
+	loadDefaultLabel,
+	loadModalTitle,
+	// render
+	handleGenKey,
 	// validate
 	validateUUID,
 	validateUrl,
+	validateBase64Key,  // this
+	validateIPv4Privnet,  // this
+	validateUniqueValue,  // this
 });
