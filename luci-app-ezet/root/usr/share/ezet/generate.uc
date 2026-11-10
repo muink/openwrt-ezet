@@ -51,6 +51,19 @@ function get_peers(cfg) {
 		die(sprintf("unsupported type %s of peers %J.", cfg_type, cfg));
 }
 
+function get_listeners(cfg) {
+	if (isEmpty(cfg))
+		return null;
+
+	const cfg_type = type(cfg);
+	if (cfg_type === 'string')
+		return uci.get(uciconf, cfg, 'uri');
+	else if (cfg_type === 'array')
+		return filter(map(cfg, c => get_listeners(c)), v => !isEmpty(v));
+	else
+		die(sprintf("unsupported type %s of listeners %J.", cfg_type, cfg));
+}
+
 /* Config helper END */
 
 /* Main */
@@ -90,6 +103,13 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		ipv6_public_addr_auto: strToBool(cfg.ipv6_public_addr_auto) || false,
 		ipv6_public_addr_prefix: cfg.ipv6_public_addr_prefix || auto_ipv6_gua_prefix,
 		peer: filter([...get_peers(cfg.peers), get_peers(cfg.external_node)], v => !isEmpty(v)),
+		...(strToBool(cfg.no_listener) ? {
+			listeners: [],
+		} : {
+			listeners: get_listeners(cfg.listeners),
+			// ipv6_listener: , // Deprecated
+			mapped_listeners: get_listeners(cfg.mapped_listeners),
+		}),
 
 		/* Secure mode settings */
 		secure_mode: strToBool(cfg.secure_mode) ? {

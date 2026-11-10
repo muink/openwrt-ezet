@@ -91,7 +91,7 @@ function ipv6RangeContains(outer, inner) {
 		stubValidator.apply('iprange6', `${inner[1]}-${outer[1]}`);
 }
 
-function renderURIs(s, uciconfig) {
+function renderURIs(s, uciconfig, isServer = false) {
 	let o;
 
 	o = s.option(form.DummyValue, 'uri', _('URI'));
@@ -120,8 +120,12 @@ function renderURIs(s, uciconfig) {
 
 	o = s.option(form.Value, 'host', _('Address'));
 	o.datatype = 'host';
+	if (isServer)
+		o.placeholder = '::';
+	else
+		o.placeholder = 'host';
 	o.load = function(section_id) {
-		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('hostname').replace(/^\[/, '').replace(/\]$/, '');
+		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('hostname').replace(/^\[/, '').replace(/\]$/, '') || this.default;
 	}
 	o.onchange = function(ev, section_id, value) {
 		const UIEl = this.section.getUIElement(section_id, 'uri');
@@ -137,6 +141,7 @@ function renderURIs(s, uciconfig) {
 
 	o = s.option(form.Value, 'port', _('Port'));
 	o.datatype = 'port';
+	o.placeholder = '11010';
 	o.load = function(section_id) {
 		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('port');
 	}
@@ -466,6 +471,33 @@ return view.extend({
 		}
 		so.depends('ipv6_public_addr_provider', '1');
 		so.modalonly = true;
+
+		so = ss.taboption('field_server', form.Flag, 'no_listener', _('No listener'));
+		so.default = so.disabled;
+
+		so = ss.taboption('field_server', form.MultiValue, 'listeners', _('Listeners'));
+		so.value('', _('-- Please choose --'));
+		so.load = function(section_id) {
+			return ez.loadLabel.call(this, [
+				['', _('-- Please choose --')],
+				...ez.loadLabelValues(this.config, 'listener', {type: 'listeners'})
+			], section_id);
+		}
+		so.retain = true;
+		so.depends({no_listener: '1', '!reverse': true});
+		so.modalonly = true;
+
+		so = ss.taboption('field_server', form.MultiValue, 'mapped_listeners', _('Mapped-listeners'));
+		so.value('', _('-- Please choose --'));
+		so.load = function(section_id) {
+			return ez.loadLabel.call(this, [
+				['', _('-- Please choose --')],
+				...ez.loadLabelValues(this.config, 'listener', {type: 'mapped_listeners'})
+			], section_id);
+		}
+		so.retain = true;
+		so.depends({no_listener: '1', '!reverse': true});
+		so.modalonly = true;
 		/* General END */
 
 		/* Peers START */
@@ -505,6 +537,60 @@ return view.extend({
 
 		renderURIs(ss, data[0]);
 		/* Peers END */
+
+		/* Listeners START */
+		s.tab('listeners', _('Listeners'));
+
+		/* Listeners grid */
+		o = s.taboption('listeners', form.SectionValue, '_listener', ez.GridSection, 'listener', null);
+		ss = o.subsection;
+		ss.addremove = true;
+		ss.rowcolors = true;
+		ss.sortable = true;
+		ss.nodescriptions = true;
+		ss.ez_modaltitle = [ _('Listener'), _('Add a listener') ];
+		ss.ez_prefmt = ez.glossary[ss.sectiontype].prefmt;
+		ss.ez_lowcase_only = false;
+
+		so = ss.option(form.Value, 'label', _('Label'));
+		so.load = ez.loadDefaultLabel;
+		so.validate = ez.validateUniqueValue;
+		so.modalonly = true;
+
+		so = ss.option(form.Flag, 'enabled', _('Enable'));
+		so.default = so.enabled;
+		so.editable = true;
+
+		so = ss.option(form.Flag, 'auto_firewall', _('Firewall'),
+			_('Auto configure firewall'));
+		so.default = so.enabled;
+		so.editable = true;
+
+		so = ss.option(form.ListValue, 'type', _('Type'));
+		so.value('listeners', _('Listeners'));
+		so.value('mapped_listeners', _('Mapped-listeners'));
+		so.textvalue = ez.textvalue2Value;
+		so.validate = function(section_id, value) {
+			if (value === 'mapped_listeners') {
+				const host = this.section.getOption('host').formvalue(section_id);
+
+				if (stubValidator.apply('hostname', host) === true)
+					return true;
+
+				if (stubValidator.apply('ip4addr', host) === true) {
+					if (ez.validateIPv4Privnet.call(this, section_id, host) === true)
+						return _('Expecting: %s').format(_('valid IPv4 global routable address'));
+					else
+						return true;
+				} else if (ez.stubValidator.apply('ip6addr', host) === true)
+					return ez.validateIPv6Guanet.call(this, section_id, host);
+			}
+
+			return true;
+		}
+
+		renderURIs(ss, data[0], true);
+		/* Listeners END */
 
 		return m.render();
 	}

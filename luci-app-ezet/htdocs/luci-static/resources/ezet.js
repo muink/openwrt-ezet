@@ -318,6 +318,7 @@ function loadLabelValues(uciconfig, sectiontype, options = {}) {
 
 	switch (sectiontype) {
 		case 'peer':
+		case 'listener':
 			uci.sections(uciconfig, sectiontype, (res) => {
 				if (
 					res.enabled !== '0' &&

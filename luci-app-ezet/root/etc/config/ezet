@@ -29,3 +29,18 @@ config peer 'peer_WindMC'
 	option type 'public'
 	option uri 'tcp://161.33.207.13:51010'
 
+config listener 'listener_TCP'
+	option label 'TCP'
+	option type 'listeners'
+	option uri 'tcp://0.0.0.0:11010'
+
+config listener 'listener_UDP'
+	option label 'UDP'
+	option type 'listeners'
+	option uri 'udp://localhost:11010'
+
+config listener 'listener_WireGuard'
+	option label 'WireGuard'
+	option type 'listeners'
+	option uri 'wg://[::]:11011'
+
