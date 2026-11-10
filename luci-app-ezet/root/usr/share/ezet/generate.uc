@@ -22,7 +22,9 @@ const uciezet = 'config';
 const uciglobal = 'global';
 
 const uciinst = 'instance',
-      ucipeer = 'peer';
+      ucipeer = 'peer',
+      ucilser = 'listener',
+      ucistun = 'stun_server';
 
 /* Global options */
 const machine_id = uci.get(uciconf, uciglobal, 'machine_id') || ubus.call('luci.ezet', 'get_host_info')?.machine_id,

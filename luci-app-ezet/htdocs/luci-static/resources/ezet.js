@@ -36,6 +36,12 @@ const glossary = {
 	peer: {
 		prefmt: 'peer_%s',
 	},
+	listener: {
+		prefmt: 'listener_%s',
+	},
+	stun_server: {
+		prefmt: 'stun_server_%s',
+	},
 };
 
 const peers_type = [
@@ -251,6 +257,35 @@ function generateRand(type, length) {
 	};
 }
 
+function getFeatures() {
+	const callGetFeatures = rpc.declare({
+		object: 'luci.ezet',
+		method: 'get_features',
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callGetFeatures(), {});
+}
+
+function getServiceStatus(instance) {
+	const conf = 'ezet';
+	const callServiceList = rpc.declare({
+		object: 'service',
+		method: 'list',
+		params: ['name'],
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callServiceList(conf), {})
+		.then((res) => {
+			let isRunning = false;
+			try {
+				isRunning = res[conf]['instances'][instance].running;
+			} catch (e) {}
+			return isRunning;
+		});
+}
+
 /* thanks to homeproxy */
 function loadDefaultLabel(section_id) {
 	const label = uci.get(this.config, section_id, 'label');
@@ -347,6 +382,15 @@ function handleGenKey(section_id, option) {
 	}
 }
 
+function handleReload(instance, ev, section_id) {
+	instance = instance || '';
+	return fs.exec('/etc/init.d/ezet', ['reload', instance])
+		.then((res) => { /* return window.location = window.location.href.split('#')[0] */ })
+		.catch((e) => {
+			ui.addNotification(null, E('p', _('Failed to execute "/etc/init.d/ezet %s %s" reason: %s').format('reload', instance, e)), 'error')
+		})
+}
+
 function textvalue2Value(section_id) {
 	let cval = this.cfgvalue(section_id);
 	let i = this.keylist.indexOf(cval);
@@ -404,6 +448,20 @@ function validateIPv4Privnet(section_id, value) {
 	return true;
 }
 
+function validateIPv6Guanet(section_id, value) {
+	if (!value)
+		return true;
+
+	const result = stubValidator.apply('ipmask6', value);
+	if (result !== true)
+		return result;
+
+	if (value.match(/^(::1?(\/|$)|(f[cd]|fe[89ab]|ff))/))
+		return _('Expecting: %s').format(_('valid IPv6 global unicast address'));
+
+	return true;
+}
+
 function validateUniqueValue(section_id, value) {
 	if (!value)
 		return _('Expecting: %s').format(_('non-empty value'));
@@ -438,6 +496,8 @@ return baseclass.extend({
 
 	/* Method */
 	generateRand,
+	getFeatures,
+	getServiceStatus,
 	// load
 	loadDefaultLabel,
 	loadModalTitle,
@@ -445,11 +505,13 @@ return baseclass.extend({
 	loadLabelValues,
 	// render
 	handleGenKey,
+	handleReload,
 	textvalue2Value,
 	// validate
 	validateUUID,
 	validateUrl,
 	validateBase64Key,  // this
 	validateIPv4Privnet,  // this
+	validateIPv6Guanet,  // this
 	validateUniqueValue,  // this
 });
