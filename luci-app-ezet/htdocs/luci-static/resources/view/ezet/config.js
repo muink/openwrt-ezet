@@ -52,28 +52,48 @@ function renderURIs(s, uciconfig, isServer = false) {
 	let o;
 
 	o = s.option(form.DummyValue, 'uri', _('URI'));
+	o.load = function(section_id) {
+		const value = this.super('load', section_id);
+
+		this[`${this.option}_${section_id}`] = new PeerURI(value);
+
+		return value;
+	}
+	o.instget = function(section_id) {return this[`${this.option}_${section_id}`]}
+	o.instset = function(section_id, callback = inst => inst) {
+		const UIEl = this.getUIElement(section_id);
+
+		const inst = this[`${this.option}_${section_id}`];
+		callback(inst);
+
+		UIEl.node.previousSibling.innerText = inst.toString();
+		UIEl.setValue(inst.toString());
+	}
 	o.write = form.AbstractValue.prototype.write;
 	o.remove = form.AbstractValue.prototype.remove;
 	o.editable = true;
+
+	// common part
+	const initPart = function(o, key,
+		load_callback = (k, inst) => inst.getKey(k),
+		onchange_callback = (k, v, inst) => inst.setKey(k, v)
+	) {
+		o.load = function(section_id) {
+			return load_callback(key, this.section.getOption('uri').instget(section_id));
+		}
+		o.onchange = function(ev, section_id, value) {
+			this.section.getOption('uri').instset(section_id, L.bind(onchange_callback, this, key, value));
+		}
+		o.write = function() {};
+		o.modalonly = true;
+	}
 
 	o = s.option(ez.GroupListValue, 'scheme', _('Scheme'));
 	o.default = ez.peers_type[0].types[0][0];
 	for (const {label, types} of ez.peers_type) {
 		types.forEach((res) => o.value.call(o, res, label));
 	}
-	o.load = function(section_id) {
-		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('scheme');
-	}
-	o.onchange = function(ev, section_id, value) {
-		const UIEl = this.section.getUIElement(section_id, 'uri');
-
-		let newvalue = new PeerURI(UIEl.getValue()).setKey('scheme', value).toString();
-
-		UIEl.node.previousSibling.innerText = newvalue;
-		UIEl.setValue(newvalue);
-	}
-	o.write = function() {};
-	o.modalonly = true;
+	initPart(o, 'scheme');
 
 	o = s.option(form.Value, 'host', _('Address'));
 	o.datatype = 'host';
@@ -81,35 +101,24 @@ function renderURIs(s, uciconfig, isServer = false) {
 		o.placeholder = '::';
 	else
 		o.placeholder = 'host';
-	o.load = function(section_id) {
-		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('hostname').replace(/^\[/, '').replace(/\]$/, '') || this.default;
-	}
-	o.onchange = function(ev, section_id, value) {
-		const UIEl = this.section.getUIElement(section_id, 'uri');
+	initPart(o, 'hostname',
+		(k, inst) => inst.getKey(k).replace(/^\[/, '').replace(/\]$/, ''),
+		(k, v, inst) => inst.setKey(k, v.match(':') ? `[${v}]` : v)
+	);
+	o.validate = function(section_id, value) {
+		const scheme = this.section.getOption('scheme').formvalue(section_id);
 
-		let newvalue = new PeerURI(UIEl.getValue()).setKey('hostname', value.match(':') ? `[${value}]` : value).toString();
+		if (['txt', 'srv'].includes(scheme) && !ez.stubValidator.apply('hostname', value))
+			return _('Expecting: %s').format(_('hostname only'));
 
-		UIEl.node.previousSibling.innerText = newvalue;
-		UIEl.setValue(newvalue);
+		return true;
 	}
-	o.write = function() {};
 	o.rmempty = false;
-	o.modalonly = true;
 
 	o = s.option(form.Value, 'port', _('Port'));
 	o.datatype = 'port';
 	o.placeholder = '11010';
-	o.load = function(section_id) {
-		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('port');
-	}
-	o.onchange = function(ev, section_id, value) {
-		const UIEl = this.section.getUIElement(section_id, 'uri');
-
-		let newvalue = new PeerURI(UIEl.getValue()).setKey('port', value).toString();
-
-		UIEl.node.previousSibling.innerText = newvalue;
-		UIEl.setValue(newvalue);
-	}
+	initPart(o, 'port');
 	o.validate = function(section_id, value) {
 		const widget = this.getUIElement(section_id).node.querySelector('input');
 		const scheme = this.section.getOption('scheme').formvalue(section_id);
@@ -127,22 +136,10 @@ function renderURIs(s, uciconfig, isServer = false) {
 
 		return true;
 	}
-	o.write = function() {};
-	o.modalonly = true;
 
 	o = s.option(form.Value, 'path', _('Path'));
 	o.placeholder = '/';
-	o.load = function(section_id) {
-		return new PeerURI(uci.get(uciconfig, section_id, 'uri')).getKey('pathname');
-	}
-	o.onchange = function(ev, section_id, value) {
-		const UIEl = this.section.getUIElement(section_id, 'uri');
-
-		let newvalue = new PeerURI(UIEl.getValue()).setKey('pathname', value).toString();
-
-		UIEl.node.previousSibling.innerText = newvalue;
-		UIEl.setValue(newvalue);
-	}
+	initPart(o, 'pathname');
 	o.validate = function(section_id, value) {
 		const widget = this.getUIElement(section_id).node.querySelector('input');
 		const scheme = this.section.getOption('scheme').formvalue(section_id);
@@ -160,8 +157,6 @@ function renderURIs(s, uciconfig, isServer = false) {
 
 		return true;
 	}
-	o.write = function() {};
-	o.modalonly = true;
 }
 
 function validateTotalPeers(section_id, value) {
