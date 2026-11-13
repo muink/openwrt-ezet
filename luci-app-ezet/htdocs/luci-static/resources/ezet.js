@@ -79,17 +79,17 @@ const CBIGridSection = form.GridSection.extend({
 		return loadDefaultLabel.apply(this, arguments);
 	},
 
-	renderSectionAdd(extra_class) {
+	renderSectionAdd(/* ... */) {
 		const prefmt = this.ez_prefmt || '%s';
 		const LC = this.ez_lowcase_only;
 
-		let el = form.GridSection.prototype.renderSectionAdd.call(this, extra_class),
-			nameEl = el.querySelector('.cbi-section-create-name');
+		let node = form.GridSection.prototype.renderSectionAdd.apply(this, arguments),
+			nameEl = node.querySelector('.cbi-section-create-name');
 
 		nameEl.placeholder = _('Specify a ID');
 
 		ui.addValidator(nameEl, 'uciname', true, (v) => {
-			let button = el.querySelector('.cbi-section-create > .cbi-button-add');
+			let button = node.querySelector('.cbi-section-create > .cbi-button-add');
 
 			if (!v) {
 				button.disabled = true;
@@ -109,7 +109,7 @@ const CBIGridSection = form.GridSection.extend({
 			}
 		}, 'blur', 'keyup');
 
-		return el;
+		return node;
 	},
 
 	handleAdd(ev, name) {
@@ -123,8 +123,8 @@ const CBIGroupListValue = form.ListValue.extend({
 	__name__: 'CBI.GroupListValue',
 
 	renderWidget(section_id, option_index, cfgvalue) {
-		const frameEl = form.ListValue.prototype.renderWidget.apply(this, arguments);
-		const select = frameEl.querySelector('select');
+		const node = form.ListValue.prototype.renderWidget.apply(this, arguments);
+		const select = node.querySelector('select');
 		const options = Array.from(select.options);
 
 		Object.keys(this.grplist).forEach((label) => {
@@ -136,7 +136,7 @@ const CBIGroupListValue = form.ListValue.extend({
 		});
 
 		select.value = (cfgvalue != null) ? cfgvalue : this.default;
-		return frameEl;
+		return node;
 	},
 
 	value(key, val) {
@@ -155,11 +155,11 @@ const CBIGroupListValue = form.ListValue.extend({
 
 const CBITextValue = form.TextValue.extend({
 	renderWidget(/* ... */) {
-		let frameEl = form.TextValue.prototype.renderWidget.apply(this, arguments);
+		let node = form.TextValue.prototype.renderWidget.apply(this, arguments);
 
-		frameEl.querySelector('textarea').style.fontFamily = monospacefonts.join(',');
+		node.querySelector('textarea').style.fontFamily = monospacefonts.join(',');
 
-		return frameEl;
+		return node;
 	}
 });
 
