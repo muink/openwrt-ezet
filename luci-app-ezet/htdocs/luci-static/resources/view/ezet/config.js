@@ -326,9 +326,9 @@ return view.extend({
 		so = ss.taboption('field_Base', form.MultiValue, 'peers', _('Trusted peers'));
 		so.value('', _('-- Please choose --'));
 		so.load = function(section_id) {
-			return ez.loadLabel.call(this, [
+			return ez.loadChoices.call(this, [
 				['', _('-- Please choose --')],
-				...ez.loadLabelValues(this.config, 'peer', {type: 'private'})
+				...ez.loadChoicesGetMap(this.config, 'peer', {type: 'private'})
 			], section_id);
 		}
 		so.validate = validateTotalPeers;
@@ -338,9 +338,9 @@ return view.extend({
 			_('Use a public shared node to discover peers.'));
 		so.value('', _('none'));
 		so.load = function(section_id) {
-			return ez.loadLabel.call(this, [
+			return ez.loadChoices.call(this, [
 				['', _('none')],
-				...ez.loadLabelValues(this.config, 'peer', {type: 'public'})
+				...ez.loadChoicesGetMap(this.config, 'peer', {type: 'public'})
 			], section_id);
 		}
 		so.validate = validateTotalPeers;
@@ -430,9 +430,9 @@ return view.extend({
 		so = ss.taboption('field_server', form.MultiValue, 'listeners', _('Listeners'));
 		so.value('', _('-- Please choose --'));
 		so.load = function(section_id) {
-			return ez.loadLabel.call(this, [
+			return ez.loadChoices.call(this, [
 				['', _('-- Please choose --')],
-				...ez.loadLabelValues(this.config, 'listener', {type: 'listeners'})
+				...ez.loadChoicesGetMap(this.config, 'listener', {type: 'listeners'})
 			], section_id);
 		}
 		so.retain = true;
@@ -442,9 +442,9 @@ return view.extend({
 		so = ss.taboption('field_server', form.MultiValue, 'mapped_listeners', _('Mapped-listeners'));
 		so.value('', _('-- Please choose --'));
 		so.load = function(section_id) {
-			return ez.loadLabel.call(this, [
+			return ez.loadChoices.call(this, [
 				['', _('-- Please choose --')],
-				...ez.loadLabelValues(this.config, 'listener', {type: 'mapped_listeners'})
+				...ez.loadChoicesGetMap(this.config, 'listener', {type: 'mapped_listeners'})
 			], section_id);
 		}
 		so.retain = true;
