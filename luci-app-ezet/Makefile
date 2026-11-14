@@ -18,6 +18,8 @@ PKG_NAME:=luci-app-ezet
 
 define Package/luci-app-ezet/conffiles
 /etc/config/ezet
+/etc/ezet/config/
+/etc/ezet/instance/
 endef
 
 define Package/luci-app-ezet/prerm

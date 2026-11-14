@@ -1,0 +1,9 @@
+#!/bin/sh
+# Migration script for ezet
+# Used to migrate LuCI application option.
+
+CONF=ezet
+
+#uci commit "$CONF"
+
+exit 0

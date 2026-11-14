@@ -6,6 +6,7 @@ export const EZ_DIR = '/etc/ezet';
 export const EXE_DIR = '/usr/libexec/ezet';
 export const SDL_DIR = '/usr/share/ezet';
 export const RUN_DIR = '/var/run/ezet';
+export const RES_TYPE = ['config', 'instance'];
 /* Global variables END */
 
 /* Utilities start */

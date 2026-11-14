@@ -11,7 +11,7 @@ import { cursor } from 'uci';
 import {
 	isEmpty, strToBool, strToInt, arrToObj, removeBlankAttrs,
 	IPv4CIDR, IPv6CIDR, // @less_26_??
-	EZ_DIR, RUN_DIR,
+	EZ_DIR, RUN_DIR
 } from 'ezet';
 
 /* UCI config START */
@@ -33,6 +33,10 @@ const uciinst = 'instance',
 /* Global options */
 const machine_id = uci.get(uciconf, uciglobal, 'machine_id') || ubus.call('luci.ezet', 'get_host_info')?.machine_id,
       hostname = uci.get(uciconf, uciglobal, 'hostname') || ubus.call('luci.ezet', 'get_host_info')?.hostname,
+      console_log_level = uci.get(uciconf, uciglobal, 'console_log_level') || 'info',
+      file_log_level = uci.get(uciconf, uciglobal, 'file_log_level') || 'warn',
+      file_log_size = strToInt(uci.get(uciconf, uciglobal, 'file_log_size')) ?? 5,
+      file_log_count = strToInt(uci.get(uciconf, uciglobal, 'file_log_count')) ?? 1,
       auto_ipv6_gua_prefix = ubus.call('luci.ezet', 'detect_ipv6_gua_prefix').result?.pd;
 
 /* UCI config END */
@@ -71,37 +75,52 @@ function get_listeners(cfg) {
 /* Config helper END */
 
 /* Main */
+const options = removeBlankAttrs({
+	/* Config settings */
+	//// "config-server": ,
+	"machine-id": machine_id,
+	"state-dir": `${EZ_DIR}/${uciinst}`,
+	//// "config-file": ,
+	"config-dir": `${EZ_DIR}/config`,
+	//// "shared-runtime": ,
+	//// "check-config": ,
+	//// "daemon": ,
+	//// "generate-completions": ,
+	//// "disable-env-parsing": ,
+
+	/* Logging settings */
+	"console-log-level": console_log_level,
+	"file-log-level": file_log_level,
+	"file-log-dir": RUN_DIR,
+	"file-log-size": file_log_size,
+	"file-log-count": file_log_count,
+
+	/* RPC settings */
+	//// "rpc-portal": ,
+	//// "rpc-portal-whitelist": ,
+});
+
 const configs = [];
 
 uci.foreach(uciconf, uciinst, (cfg) => {
 	if (cfg.enabled === '0')
 		return;
 
-	const config = {
-		/* Global settings */
-		// console_log_level: ,
-		// file_log_level: ,
-		// file_log_dir: ,
-		// file_log_size_mb: ,
-		// file_log_count: ,
+	const config = removeBlankAttrs({
+		/* General settings */
 		hostname: hostname,
 		instance_name: cfg.label,
-
-		/* Config server settings */
-		machine_id: machine_id,
-		// config_server: ,
-		// state_dir: ,
-		// config_file: ,
-		// config_dir: ,
-		// disable_env_parsing: ,
-		// check_config: ,
+		// instance_id: "11111111-2222-4333-8444-555555555555", # Optional UUID
+		// netns: 'easytier',                                   # Optional Linux network namespace
 
 		/* Network settings */
-		network_name: cfg.network_name,
-		network_secret: cfg.network_secret,
+		network_identity: {
+			network_name: cfg.network_name,
+			network_secret: cfg.network_secret,
+		},
 		ipv4: cfg.ipv4,
 		ipv6: cfg.ipv6,
-		dhcp: (dhcp === '0') ? false : cfg.ipv4
+		dhcp: (cfg.dhcp === '0') ? false : cfg.ipv4
 			? ((cidr) => {
 				let prefix = less_26 ? IPv4CIDR(cidr) : netaddr.new(cidr); // @less_26_??
 
@@ -110,7 +129,7 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 					: netaddr.new(prefix.network().tostring(), prefix.bits).tostring();
 			})(cfg.ipv4)
 			: true,
-		dhcpv6: (dhcpv6 === '0') ? false : cfg.ipv6
+		dhcpv6: (cfg.dhcpv6 === '0') ? false : cfg.ipv6
 			? ((cidr) => {
 				let prefix = less_26 ? IPv6CIDR(cidr) : netaddr.new(cidr); // @less_26_??
 
@@ -121,32 +140,37 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 			: true,
 		ipv6_public_addr_provider: strToBool(cfg.ipv6_public_addr_provider) || false,
 		ipv6_public_addr_auto: strToBool(cfg.ipv6_public_addr_auto) || false,
-		ipv6_public_addr_prefix: cfg.ipv6_public_addr_prefix || auto_ipv6_gua_prefix,
-		peer: filter([...get_peers(cfg.peers), get_peers(cfg.external_node)], v => !isEmpty(v)),
-		...(strToBool(cfg.no_listener) ? {
-			listeners: [],
-		} : {
-			listeners: get_listeners(cfg.listeners),
-			// ipv6_listener: , // Deprecated
-			mapped_listeners: get_listeners(cfg.mapped_listeners),
-		}),
+		ipv6_public_addr_prefix: cfg.ipv6_public_addr_prefix, // || auto_ipv6_gua_prefix,
 
 		/* Secure mode settings */
 		secure_mode: strToBool(cfg.secure_mode) ? {
 			enabled: true,
 			local_private_key: cfg.local_private_key,
 			local_public_key: cfg.local_public_key,
-			// credential: ,
-			// credential_file: ,
+			//// credential: ,
+			//// credential_file: ,
 		} : null,
+
+		/* Peers settings */
+		peer: filter([...(get_peers(cfg.peers) || []), get_peers(cfg.external_node)], v => !isEmpty(v)),
+		//// proxy_network: cfg.proxy_networks,
+
+		/* Listener settings */
+		...(strToBool(cfg.no_listener) ? {
+			listeners: [],
+		} : {
+			listeners: get_listeners(cfg.listeners) || [],
+			// ipv6_listener: , // Deprecated
+			mapped_listeners: get_listeners(cfg.mapped_listeners),
+		}),
 
 		/* Flags settings */
 		flags: {
 			private_mode: strToBool(cfg.private_mode),
 		},
-	};
+	});
 
 	push(configs, arrToObj([[cfg['.name'], config]]));
 });
 
-printf('%.J\n', removeBlankAttrs(configs));
+printf('%.J\n', {options: options, configs: configs});
