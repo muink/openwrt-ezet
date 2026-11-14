@@ -54,6 +54,45 @@ export function executeCommand(infd, ...args) {
 
 /**** // @less_26_?? START ****/
 /**
+ * IPv4 CIDR parser and prototype.
+ */
+export function parseIPv4CIDR(cidr) {
+	const m = match(cidr, /^([\d.]+)\/(\d{1,2})$/);
+
+	if (!m)
+		return null;
+
+	const ip = m[1];
+	const bits = int(m[2], 10);
+
+	if (bits < 0 || bits > 32)
+		return null;
+
+	let groups = split(ip, '.');
+
+	if (length(groups) != 4)
+		return null;
+
+	const bytes = [];
+
+	for (let i = 0; i < 4; i++) {
+		const group = groups[i];
+
+		if (!match(group, /^\d{1,3}$/))
+			return null;
+
+		const value = int(group, 10);
+
+		bytes[i] = value & 0xff;
+	}
+
+	return {
+		bytes,
+		bits
+	};
+};
+
+/**
  * IPv6 CIDR parser and prototype.
  */
 export function parseIPv6CIDR(cidr) {
@@ -125,6 +164,66 @@ export function parseIPv6CIDR(cidr) {
 };
 
 /**
+ * Parse IPv4 prefix length or netmask.
+ *
+ * @param {number|string|null} mask
+ * @param {number} fallback
+ * @returns {number}
+ */
+export function parseIPv4Mask(mask, fallback) {
+	if (mask == null)
+		return fallback;
+
+	if (type(mask) == 'int' || type(mask) == 'double') {
+		const bits = int(mask);
+
+		if (bits != mask || bits < 0 || bits > 32)
+			die('Invalid netmask');
+
+		return bits;
+	}
+
+	if (type(mask) != 'string')
+		die('Invalid netmask');
+
+	// Decimal prefix length
+	if (match(mask, /^\d+$/)) {
+		const bits = int(mask, 10);
+
+		if (bits > 32)
+			die('Invalid netmask');
+
+		return bits;
+	}
+
+	// IPv6 netmask
+	const parsed = parseIPv4CIDR(`${mask}/32`);
+
+	if (parsed == null)
+		die('Invalid netmask');
+
+	// Count consecutive leading one bits.
+	let bits = 0;
+	let done = false;
+
+	for (let byte in parsed.bytes) {
+		for (let bit = 7; bit >= 0; bit--) {
+			if (!(byte & (1 << bit))) {
+				done = true;
+				break;
+			}
+
+			bits++;
+		}
+
+		if (done)
+			break;
+	}
+
+	return bits;
+};
+
+/**
  * Parse IPv6 prefix length or netmask.
  *
  * @param {number|string|null} mask
@@ -182,6 +281,103 @@ export function parseIPv6Mask(mask, fallback) {
 	}
 
 	return bits;
+};
+
+/**
+ * IPv4CIDR prototype.
+ */
+export let IPv4CIDRProto;
+IPv4CIDRProto = {
+	/**
+	 * Return the original CIDR string.
+	 *
+	 * @returns {string}
+	 */
+	tostring: function() {
+		const addr = arrtoip(this.bytes);
+
+		return this.bits < 32
+			? `${addr}/${this.bits}`
+			: addr;
+	},
+
+	/**
+	 * Derive the network address.
+	 *
+	 * @param {number|string|null} mask
+	 * @returns {IPv4CIDR}
+	 */
+	network: function(mask) {
+		const bits = parseIPv6Mask(mask, this.bits);
+		const bytes = [];
+
+		for (let i = 0; i < 4; i++) {
+			const remaining = bits - i * 8;
+
+			if (remaining >= 8)
+				bytes[i] = this.bytes[i];
+			else if (remaining <= 0)
+				bytes[i] = 0;
+			else {
+				const mask = (0xff << (8 - remaining)) & 0xff;
+
+				bytes[i] = this.bytes[i] & mask;
+			}
+		}
+
+		// netaddr.range.network() returns a full-width address.
+		return proto({
+			bytes,
+			bits: 32
+		}, IPv4CIDRProto);
+	},
+
+	/**
+	 * Check whether this CIDR contains another CIDR.
+	 *
+	 * @param {IPv4CIDR|string} other
+	 * @returns {boolean}
+	 */
+	contains: function(other) {
+		if (type(other) == 'string')
+			other = IPv4CIDR(other);
+
+		if (other == null || this.bits > other.bits)
+			return false;
+
+		const fullBytes = this.bits >> 3;
+		const remainingBits = this.bits & 7;
+
+		for (let i = 0; i < fullBytes; i++) {
+			if (this.bytes[i] != other.bytes[i])
+				return false;
+		}
+
+		if (remainingBits) {
+			const mask = (0xff << (8 - remainingBits)) & 0xff;
+
+			if ((this.bytes[fullBytes] & mask) !=
+				(other.bytes[fullBytes] & mask))
+				return false;
+		}
+
+		return true;
+	},
+
+	/**
+	 * Check whether two CIDRs are exactly equal.
+	 *
+	 * @param {IPv4CIDR|string} other
+	 * @returns {boolean}
+	 */
+	equals: function(other) {
+		if (type(other) == 'string')
+			other = IPv4CIDR(other);
+
+		return other != null &&
+			this.bits == other.bits &&
+			this.contains(other);
+	}
 };
 
 /**
@@ -279,6 +475,21 @@ IPv6CIDRProto = {
 			this.bits == other.bits &&
 			this.contains(other);
 	}
+};
+
+/**
+ * Create an IPv4 CIDR instance.
+ *
+ * @param {string} cidr
+ * @returns {object|null}
+ */
+export function IPv4CIDR(cidr) {
+	const parsed = parseIPv4CIDR(cidr);
+
+	if (parsed == null)
+		return null;
+
+	return proto(parsed, IPv4CIDRProto);
 };
 
 /**

@@ -283,7 +283,7 @@ return view.extend({
 		so.modalonly = true;
 
 		so = ss.taboption('field_Base', form.Value, 'ipv4', _('Virtual IPv4 address'));
-		so.datatype = 'ip4addr';
+		so.datatype = 'cidr4';
 		so.placeholder = '10.11.12.1/24';
 		so.validate = function(section_id, value) {
 			value = this.formvalue(section_id); // Required. Otherwise, the value will contain only the mask part.
@@ -298,16 +298,26 @@ return view.extend({
 			}.call(this.section.getOption('dhcp'));
 			return dhcp ? _('DHCP') : cval;
 		}
-		so.rmempty = false;
-		so.depends('dhcp', '0');
 
 		so = ss.taboption('field_Base', form.Flag, 'dhcpv6', _('DHCPv6'));
 		so.default = so.enabled;
 		so.modalonly = true;
 
 		so = ss.taboption('field_Base', form.Value, 'ipv6', _('Virtual IPv6 address'));
-		so.datatype = 'ip6ula';
+		so.datatype = 'cidr6';
 		so.placeholder = 'fd12:3456:789a::1/64';
+		so.validate = function(section_id, value) {
+			value = this.formvalue(section_id); // Required. Otherwise, the value will contain only the mask part.
+
+			if (!value)
+				return true;
+
+			const result = ez.stubValidator.apply('ip6ula', value);
+			if (result !== true)
+				return _('Expecting: %s').format(_('valid IPv6 ULA address'));
+
+			return true;
+		}
 		so.textvalue = function(section_id) {
 			let cval = this.cfgvalue(section_id) || this.default;
 			let dhcp = function() {
@@ -316,8 +326,6 @@ return view.extend({
 			}.call(this.section.getOption('dhcpv6'));
 			return dhcp ? _('DHCPv6') : cval;
 		}
-		so.rmempty = false;
-		so.depends('dhcpv6', '0');
 
 		so = ss.taboption('field_Base', form.Flag, 'ipv6_public_addr_auto', _('IPv6 GUA'),
 			_('Auto-obtain a IPv6 GUA from a peer that shares its IPv6 subnet.'));

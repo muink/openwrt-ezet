@@ -2,11 +2,15 @@
 
 'use strict';
 
+const less_26 = true;
+
 import { connect } from 'ubus';
 import { cursor } from 'uci';
+//import * as netaddr from 'netaddr'; // @less_26_??
 
 import {
 	isEmpty, strToBool, strToInt, arrToObj, removeBlankAttrs,
+	IPv4CIDR, IPv6CIDR, // @less_26_??
 	EZ_DIR, RUN_DIR,
 } from 'ezet';
 
@@ -97,8 +101,24 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		network_secret: cfg.network_secret,
 		ipv4: cfg.ipv4,
 		ipv6: cfg.ipv6,
-		dhcp: (dhcp === '0') ? false : true,
-		dhcpv6: (dhcpv6 === '0') ? false : true,
+		dhcp: (dhcp === '0') ? false : cfg.ipv4
+			? ((cidr) => {
+				let prefix = less_26 ? IPv4CIDR(cidr) : netaddr.new(cidr); // @less_26_??
+
+				return less_26 // @less_26_??
+					? IPv4CIDR(`${prefix.network().tostring()}/${prefix.bits}`).tostring()
+					: netaddr.new(prefix.network().tostring(), prefix.bits).tostring();
+			})(cfg.ipv4)
+			: true,
+		dhcpv6: (dhcpv6 === '0') ? false : cfg.ipv6
+			? ((cidr) => {
+				let prefix = less_26 ? IPv6CIDR(cidr) : netaddr.new(cidr); // @less_26_??
+
+				return less_26 // @less_26_??
+					? IPv6CIDR(`${prefix.network().tostring()}/${prefix.bits}`).tostring()
+					: netaddr.new(prefix.network().tostring(), prefix.bits).tostring();
+			})(cfg.ipv6)
+			: true,
 		ipv6_public_addr_provider: strToBool(cfg.ipv6_public_addr_provider) || false,
 		ipv6_public_addr_auto: strToBool(cfg.ipv6_public_addr_auto) || false,
 		ipv6_public_addr_prefix: cfg.ipv6_public_addr_prefix || auto_ipv6_gua_prefix,
