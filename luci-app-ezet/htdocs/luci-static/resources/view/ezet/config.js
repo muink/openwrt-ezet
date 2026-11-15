@@ -197,7 +197,7 @@ return view.extend({
 		o = s.taboption('general', form.SectionValue, '_global', form.NamedSection, 'global', 'core', _('Global settings'));
 		ss = o.subsection;
 
-		so = ss.option(form.Flag, 'enable', _('Enable'));
+		so = ss.option(form.Flag, 'core_enabled', _('Enable'));
 		so.ucisection = 'config';
 		so.default = so.disabled;
 

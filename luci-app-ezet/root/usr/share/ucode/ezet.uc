@@ -51,6 +51,30 @@ export function executeCommand(infd, ...args) {
 		binary
 	};
 };
+
+export function yqRead(flags, command, content) {
+	let infd = mkstemp();
+
+	if (content) {
+		content = trim(content);
+		content = replace(content, /\r\n?/g, '\n');
+		if (!match(content, /\n$/))
+			content += '\n';
+	}
+	infd.write(content);
+
+	infd.seek();
+	const out = executeCommand(infd, 'yq', flags, shellQuote(command));
+	infd.close();
+
+	return out.stdout;
+};
+
+export function yqReadFile(flags, command, filepath) {
+	const out = executeCommand(null, 'yq', flags, shellQuote(command), shellQuote(filepath));
+
+	return out.stdout;
+};
 /* Utilities end */
 
 /**** // @less_26_?? START ****/

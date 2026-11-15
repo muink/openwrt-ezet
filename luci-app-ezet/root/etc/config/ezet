@@ -8,6 +8,8 @@ config core 'global'
 	option console_log_level 'info'
 	option file_log_level 'warn'
 
+config web 'console'
+
 config instance 'instance_easytier'
 	option label 'easytier'
 	option network_name 'easytier'

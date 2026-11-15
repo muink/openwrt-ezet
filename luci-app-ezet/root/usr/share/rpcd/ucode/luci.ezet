@@ -4,11 +4,11 @@
 
 const less_26 = true;
 
-import { access, glob, lstat, popen, readfile, writefile } from 'fs';
+import { access, basename, glob, lstat, mkdir, popen, readfile, writefile } from 'fs';
 import * as digest from 'digest';
 //import * as netaddr from 'netaddr'; // @less_26_??
 import {
-	shellQuote, isEmpty,
+	shellQuote, isEmpty, yqRead, yqReadFile,
 	IPv6CIDR, // @less_26_??
 	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR
 } from 'ezet';
@@ -330,6 +330,48 @@ const methods = {
 			}
 
 			return { result: false, error: 'No prefix available' };
+		}
+	},
+
+	write_configs: {
+		args: { configs: 'configs' },
+		call: function(req) {
+			const configs = json(trim(req.args?.configs || '[]'));
+
+			if (isEmpty(configs))
+				return { result: false, error: 'empty configs' };
+
+			mkdir(RUN_DIR);
+
+			const keeps = [];
+			const errors = [];
+			for (let config in configs) {
+				if (type(config) === 'string')
+					push(keeps, `${RUN_DIR}/${config}.toml`);
+				else if (type(config) === 'object') {
+					const inst_name = keys(config)[0];
+					const instance_name = config[inst_name].instance_name;
+					const file_path = `${RUN_DIR}/${inst_name}.toml`;
+
+					writefile(file_path, yqRead('-Potoml', '.', sprintf('%J', config[inst_name])));
+
+					const filestat = lstat(file_path);
+					if (filestat && filestat.size > 0)
+						push(keeps, file_path);
+					else
+						push(errors, `[${instance_name}]: failed to generate configuration`);
+				} else
+					push(errors, `[${instance_name}]: llegal config type '${type(config)}'`);
+			}
+
+			for (let rm in (glob(RUN_DIR + '/*.toml') || []))
+				if (!(rm in keeps))
+					system(`rm -f "${rm}"`);
+
+			if (length(errors) > 0)
+				return { result: false, error: join('\n', errors) };
+			else
+				return { result: keeps };
 		}
 	},
 

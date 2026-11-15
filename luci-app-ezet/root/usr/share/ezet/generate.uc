@@ -106,6 +106,11 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 	if (cfg.enabled === '0')
 		return;
 
+	if (length(ARGV) > 0 && !(cfg['.name'] in ARGV)) {
+		push(configs, cfg['.name']);
+		return;
+	}
+
 	const config = removeBlankAttrs({
 		/* General settings */
 		hostname: hostname,
