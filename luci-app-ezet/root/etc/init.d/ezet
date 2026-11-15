@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+
+START=97
+STOP=90
+USE_PROCD=1
+
+CONF="ezet"
+PROG="/usr/bin/easytier-core"
+
+HM_DIR="/etc/ezet"
+EXE_DIR="/usr/libexec/ezet"
+SDL_DIR="/usr/share/ezet"
+RUN_DIR="/var/run/ezet"
+LOG_PATH="$RUN_DIR/ezet.log"
+

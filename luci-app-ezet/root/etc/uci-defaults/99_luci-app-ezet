@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# Initialize necessary directories
+for d in config instance; do
+	mkdir -p "/etc/ezet/$d/" 2>/dev/null
+done
+
+# Initialize default firewall table
+uci -q batch <<-EOF >"/dev/null"
+	delete firewall.ezet_pre
+	set firewall.ezet_pre=include
+	set firewall.ezet_pre.type=nftables
+	set firewall.ezet_pre.path="/var/run/ezet/ezet_pre.nft"
+	set firewall.ezet_pre.position="table-pre"
+
+	delete firewall.ezet_post
+	set firewall.ezet_post=include
+	set firewall.ezet_post.type=nftables
+	set firewall.ezet_post.path="/var/run/ezet/ezet_post.nft"
+	set firewall.ezet_post.position="ruleset-post"
+	commit firewall
+EOF
+
+exit 0

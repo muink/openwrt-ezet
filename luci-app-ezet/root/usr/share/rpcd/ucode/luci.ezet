@@ -1,0 +1,350 @@
+#!/usr/bin/ucode
+
+'use strict';
+
+const less_26 = true;
+
+import { access, glob, lstat, popen, readfile, writefile } from 'fs';
+import * as digest from 'digest';
+//import * as netaddr from 'netaddr'; // @less_26_??
+import {
+	shellQuote, isEmpty,
+	IPv6CIDR, // @less_26_??
+	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR
+} from 'ezet';
+
+function hasKernelModule(kmod) {
+	return (system(sprintf('[ -e "/lib/modules/$(uname -r)"/%s ]', shellQuote(kmod))) === 0);
+}
+
+// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier-core/src/peers/public_ipv6/mod.rs#L91
+function is_global_routable_public_ipv6(ip6addr) {
+	if (match(ip6addr, /^(::1?(\/|$)|(f[cd]|fe[89ab]|ff))/)) // or just match GUA: `2000::/3` ?
+		return false;
+	return true;
+}
+
+// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier/src/instance/public_ipv6_provider/linux.rs#L140
+function detect_public_ipv6_prefix_from_routes(routes) {
+	const prefixs = filter(map(routes, (route) => {
+		// is default route and routeType is unicast?
+		// 'ip -6 -j route show default type unicast'
+		if ((!route.dst || route.dst == 'default' || route.dst == '::/0') &&
+			(route.type || 'unicast') == 'unicast')
+			route.dst = '::/0';
+		else
+			return;
+
+		const src = route.from, wan_dev = route.dev;
+
+		if (!src || !wan_dev)
+			return;
+
+		// is the format correct?
+		if (!match(src, /^([[:xdigit:]:.]+)\/(\d{1,3})$/))
+			return;
+
+		// is_global_routable_public_ipv6_prefix(prefix)
+		if (!is_global_routable_public_ipv6(src))
+			return;
+
+		let prefix;
+		if (less_26) // @less_26_??
+			prefix = IPv6CIDR(src);
+		else
+			prefix = netaddr.new(src);
+
+		if (prefix.bits < 1 || prefix.bits > 128)
+			return;
+
+		let delegated = filter(routes, candidate => {
+			if (!match(candidate.dst, /^([[:xdigit:]:.]+)\/(\d{1,3})$/))
+				return;
+
+			let lan;
+			if (less_26) // @less_26_??
+				lan = IPv6CIDR(candidate.dst);
+			else
+				lan = netaddr.new(candidate.dst);
+			return prefix.contains(lan) && // rust src: candidate.dst == prefix
+			(candidate.dev != wan_dev) &&
+			(candidate.dev != 'lo') &&
+			(candidate.type || 'unicast') == 'unicast';
+		});
+
+		if (!isEmpty(delegated))
+			return {
+				pd: prefix,
+				delegated: map(delegated, (e) => {
+					return { dst: e.dst, dev: e.dev };
+				}),
+				ndp_target: null
+			};
+	}), v => v);
+
+	if (isEmpty(prefixs))
+		return;
+
+	return sort(prefixs, (a, b) => a.pd.bits - b.pd.bits)[0];
+}
+
+// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier/src/instance/public_ipv6_provider/linux.rs#L293
+function detect_public_ipv6_prefix_from_interfaces(routes, addresses, max_netmask) {
+	/**** detect_default_route_ipv6_interfaces(routes, max_netmask) START ****/
+	// collect all IPv6 unicast default-route ifname
+	const wan_ifnames = uniq(filter(map(routes, (route) => {
+		// is default route and routeType is unicast?
+		// 'ip -6 -j route show default type unicast'
+		if ((!route.dst || route.dst == 'default' || route.dst == '::/0') &&
+			(route.type || 'unicast') == 'unicast')
+			route.dst = '::/0';
+		else
+			return;
+
+		return route.dev;
+	}), v => v));
+	if (isEmpty(wan_ifnames))
+		return;
+
+	// enumerate IPv6 addresses on those interfaces
+	const candidates = [];
+	for (let addr in addresses)
+		for (let addr_info in addr.addr_info)
+			push(candidates, {
+				ifindex: addr.ifindex,
+				ifname: addr.ifname,
+				address: addr_info.local,
+				netmask: addr_info.prefixlen
+			});
+	if (isEmpty(candidates))
+		return;
+
+	// select_default_route_ipv6_interfaces(candidates, wan_ifnames, max_netmask)
+	const ifaces = filter(map(candidates, (candidate) => {
+		if (!(candidate.ifname in wan_ifnames))
+			return;
+
+		if (!is_global_routable_public_ipv6(candidate.address))
+			return;
+
+		if (candidate.netmask < 1 ||
+			candidate.netmask > max_netmask)
+			return;
+
+		let prefix;
+		if (less_26) // @less_26_??
+			prefix = IPv6CIDR(`${candidate.address}/${candidate.netmask}`);
+		else
+			prefix = netaddr.new(candidate.address, candidate.netmask);
+
+		return {
+			ifindex: candidate.ifindex,
+			ifname: candidate.ifname,
+			address: candidate.address,
+			pd: prefix
+		};
+	}), v => v);
+
+	if (isEmpty(ifaces))
+		return;
+	/**** detect_default_route_ipv6_interfaces(routes, max_netmask) END ****/
+
+	/**** select_public_ipv6_prefix_from_default_route_interfaces(ifaces) START ****/
+	const iface = sort(ifaces, (a, b) => a.pd.bits - b.pd.bits || a.ifindex - b.ifindex)[0];
+
+	return {
+		pd: iface.pd,
+		ndp_target: {
+			wan_ifname: iface.ifname
+		}
+	};
+	/**** select_public_ipv6_prefix_from_default_route_interfaces(ifaces) END ****/
+}
+
+const methods = {
+	keygen: {
+		args: { type: 'type', params: 'params' },
+		call: function(req) {
+			const type = req.args?.type;
+
+			if (!(type in ['wg-keypair', 'credential']))
+				return { result: false, error: 'illegal type' };
+
+			let cmd = '';
+			switch (type) {
+				case 'wg-keypair':
+					cmd = 'set -e;' +
+						'priv="$(openssl genpkey -algorithm X25519)";' +
+						'echo "PrivateKey: $(echo "$priv" | openssl pkey -outform DER | tail -c 32 | base64 | tr -d \'\r\n\')";' +
+						'echo "PublicKey: $(echo "$priv" | openssl pkey -pubout -outform DER | tail -c 32 | base64 | tr -d \'\r\n\')";';
+					break;
+				case 'credential':
+					return { result: false, error: 'not implemented' };
+					break;
+			}
+
+			let result = {};
+
+			const fd = popen(`${cmd} ${shellQuote(req.args.params ?? '')}`);
+			if (fd) {
+				for (let line = fd.read('line'); length(line); line = fd.read('line')) {
+					if (type in ['wg-keypair']) {
+						let priv = match(trim(line), /PrivateKey: (.*)/);
+						if (priv)
+							result.private_key = priv[1];
+						let pub = match(trim(line), /PublicKey: (.*)/);
+						if (pub)
+							result.public_key = pub[1];
+					}
+				}
+
+				fd.close();
+			}
+
+			return { result };
+		}
+	},
+
+	get_features: {
+		call: function() {
+			let features = {};
+			let fd;
+
+			const use_apk = system('command -v apk') == 0 || null; // @less_25_12
+
+			features.app_version = trim(popen(`${use_apk ? 'apk list -I --manifest' : 'opkg list-installed'} luci-app-ezet | ` +
+				`awk '{print $NF}'`).read('all')) || null; // @less_25_12
+
+			for (let type in ['core', 'cli', 'web']) {
+				if (system(`command -v easytier-${type}`) == 0) {
+					fd = popen(`easytier-${type} -V`);
+					if (fd) {
+						for (let line = fd.read('line'); length(line); line = fd.read('line')) {
+							let ver = match(trim(line), /\S* (.*)/);
+							if (ver)
+								features[`${type}_version`] = split(ver[1], ' ')[0];
+						}
+
+						fd.close();
+					}
+				} else features[`${type}_version`] = null;
+			}
+
+			features.has_tun = hasKernelModule('tun.ko') || access('/etc/modules.d/30-tun');
+
+			return features;
+		}
+	},
+
+	get_host_info: {
+		call: function() {
+			let fd;
+
+			const SALT = 'openwrt-ezet-machine-id:';
+
+			const macs = [];
+			for (let path in (glob('/sys/class/net/*') ?? [])) {
+				if (!access(`${path}/device`))
+					continue;
+
+				let mac = readfile(`${path}/address`);
+
+				if (mac == null)
+					continue;
+
+				mac = replace(mac, /[\r\n:-]/g, '');
+				mac = lc(mac);
+
+				if (!length(mac) || mac == '000000000000')
+					continue;
+
+				push(macs, mac);
+			}
+
+			const hash = digest.sha1(SALT + join(':', uniq(sort(macs))));
+			if (type(hash) != 'string' || length(hash) < 32)
+				return { machine_id: trim(readfile('/proc/sys/kernel/random/uuid')),
+					hostname: trim(readfile('/proc/sys/kernel/hostname')) };
+
+			function uuid_from_hash(u, version) {
+				// RFC UUID variant: 10xx
+				let variant = int(substr(u, 16, 1), 16) % 4;
+
+				let h = substr(u, 0, 12) +
+					sprintf("%01x", version) + substr(u, 13, 3) +
+					substr('89ab', variant, 1) +
+					substr(u, 17, 15);
+
+				return sprintf('%s-%s-%s-%s-%s',
+					substr(h, 0, 8),
+					substr(h, 8, 4),
+					substr(h, 12, 4),
+					substr(h, 16, 4),
+					substr(h, 20, 12)
+				);
+			}
+
+			return { machine_id: uuid_from_hash(hash, 5),
+				hostname: trim(readfile('/proc/sys/kernel/hostname')) };
+		}
+	},
+
+	// https://github.com/EasyTier/EasyTier/blob/50bddb7203990400d31584ac58bbad5b991baa5f/easytier/src/instance/public_ipv6_provider/linux.rs#L347
+	detect_ipv6_gua_prefix: {
+		call: function() {
+			const max_netmask = 64;
+			let fd;
+
+			// get all IPv6 routes
+			let routes;
+			fd = popen('ip -6 -j route show table all');
+			if (fd) {
+				routes = json(fd);
+				fd.close();
+			} else
+				return { result: false, error: 'Failed to query linux IPv6 routes' };
+
+			// Pick from default routes
+			let prefix = detect_public_ipv6_prefix_from_routes(routes);
+			if (!isEmpty(prefix)) {
+				prefix.pd = prefix.pd.tostring();
+				return { result: prefix };
+			}
+
+			// get all IPv6 interface addresses
+			let addresses;
+			fd = popen('ip -6 -j address show');
+			if (fd) {
+				addresses = json(fd);
+				fd.close();
+			} else
+				return { result: false, error: 'Failed to query linux IPv6 addresses' };
+
+			// Fallback for DHCPv6 IA_NA / SLAAC — see https://github.com/EasyTier/EasyTier/issues/2333
+			prefix = detect_public_ipv6_prefix_from_interfaces(routes, addresses, max_netmask);
+			if (!isEmpty(prefix)) {
+				prefix.pd = less_26 // @less_26_??
+					? IPv6CIDR(`${prefix.pd.network().tostring()}/${prefix.pd.bits}`).tostring()
+					: netaddr.new(prefix.pd.network().tostring(), prefix.pd.bits).tostring();
+				return { result: prefix };
+			}
+
+			return { result: false, error: 'No prefix available' };
+		}
+	},
+
+	log_clean: {
+		args: { type: 'type' },
+		call: function(req) {
+			if (!(req.args?.type in ['ezet', 'easytier-core', 'easytier-web']))
+				return { result: false, error: 'illegal type' };
+
+			const filestat = lstat(`${RUN_DIR}/${req.args?.type}.log`);
+			if (filestat)
+				writefile(`${RUN_DIR}/${req.args?.type}.log`, '');
+			return { result: true };
+		}
+	}
+};
+
+return { 'luci.ezet': methods };

@@ -1,0 +1,24 @@
+{
+	"luci-app-ezet": {
+		"description": "Grant access to ezet configuration",
+		"read": {
+			"file": {
+				"/etc/init.d/ezet reload *": [ "exec" ],
+				"/var/run/ezet/ezet.log": [ "read" ],
+				"/tmp/run/ezet/ezet.log": [ "read" ],
+				"/var/run/ezet/easytier-core.log": [ "read" ],
+				"/tmp/run/ezet/easytier-core.log": [ "read" ],
+				"/var/run/ezet/easytier-web.log": [ "read" ],
+				"/tmp/run/ezet/easytier-web.log": [ "read" ]
+			},
+			"ubus": {
+				"service": [ "list" ],
+				"luci.ezet": [ "*" ]
+			},
+			"uci": [ "ezet" ]
+		},
+		"write": {
+			"uci": [ "ezet" ]
+		}
+	}
+}
