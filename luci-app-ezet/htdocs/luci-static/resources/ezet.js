@@ -47,11 +47,12 @@ const glossary = {
 
 const peers_type = [
 	{
+		id: 'protocol',
 		label: _('Direct transfer protocol'),
 		types: [
 			['tcp', _('TCP')],
 			['udp', _('UDP')],
-			['faketcp', _('FakeTCP') + ' - ' + _('FakeTCP')],
+			['faketcp', _('FakeTCP') + ' - ' + _('TCP')],
 			['ws', _('WebSocket') + ' - ' + _('TCP')],
 			['wss', _('WebSocket SSL') + ' - ' + _('TCP')],
 			['wg', _('WireGuard') + ' - ' + _('UDP')],
@@ -59,6 +60,7 @@ const peers_type = [
 		]
 	},
 	{
+		id: 'discovery',
 		label: _('Service discovery URI'),
 		types: [
 			['txt', _('DNS TXT record')],

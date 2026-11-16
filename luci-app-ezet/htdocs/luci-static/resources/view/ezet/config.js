@@ -498,12 +498,15 @@ return view.extend({
 		so.value('mapped_listeners', _('Mapped-listeners'));
 		so.textvalue = ez.textvalue2Value;
 		so.validate = function(section_id, value) {
+			const scheme = this.section.getOption('scheme').formvalue(section_id);
 			const UIEl = this.section.getUIElement(section_id, 'host');
 			const hostEl = UIEl.node.querySelector('input');
 			const host = UIEl.getValue();
 
 			if (value === 'listeners') {
 				hostEl.placeholder = '::';
+				if (ez.peers_type.filter(t => t.id === 'discovery')[0].types.map(e => e[0]).includes(scheme))
+					return _('Expecting: %s').format(_('Not is ') + _('Service discovery URI'));
 				if (ez.stubValidator.apply('hostname', host) === true)
 					return _('Expecting: %s').format(_('valid IPv4/IPv6 address'));
 			} else if (value === 'mapped_listeners') {
