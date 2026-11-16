@@ -18,29 +18,34 @@ config_load "$CONF"
 
 # add_firewall
 add_firewall() {
-	local conf_file ipport ip port
-	for conf_file in "$@"; do
-		for ipport in $(yq -ptoml '
-			.listeners
-			| .[] |= ( match("[^:]+:/{0,2}([[:xdigit:]\[\]:.]+:\d+)") | .captures[].string )
-			| unique | join(" ")
-		' "$conf_file" 2>/dev/null); do
-			ip=${ipport%:*}; ip=$(echo $ip | sed -e 's|\[||' -e 's|\]||')
-			port=${ipport##*:}
-			json_add_object ''
-			json_add_string type rule
-			json_add_string target ACCEPT
-			json_add_string name "$ipport"
-			#json_add_string family '' # '' = IPv4 and IPv6
-			json_add_string proto 'tcp udp'
-			json_add_string direction in
-			json_add_string src "*"
-			#json_add_string dest '' # '' = input
-			json_add_string dest_ip "$(echo "$ip" | grep -vE '^(0(\.\d+){3}|::)$')"
-			json_add_string dest_port "$port"
-			json_close_object
-		done
-	done
+	local enabled auto_firewall type uri
+	config_get_bool enabled "$1" "enabled" "1"
+	config_get_bool auto_firewall "$1" "auto_firewall" "1"
+	config_get type "$1" "type"
+	config_get uri "$1" "uri"
+
+	local used_uris="$2"
+
+	[ "$enabled" = "0" ] && return 0
+	[ "$auto_firewall" = "0" ] && return 0
+	[ "$type" = "listeners" ] || return 0
+	eval "echo $used_uris" | grep -q "$uri" || return 0
+
+	local ip port
+	eval "$(echo "$uri" \
+		| sed -En "s|^[^:]+:/{0,2}\[?([[:xdigit:]:.]+)\]?:(\d+)|ip='\1';port='\2';|p")"
+	json_add_object ''
+	json_add_string type rule
+	json_add_string target ACCEPT
+	json_add_string name "$1"
+	#json_add_string family '' # '' = IPv4 and IPv6
+	json_add_string proto 'tcp udp'
+	json_add_string direction in
+	json_add_string src "*"
+	#json_add_string dest '' # '' = input
+	json_add_string dest_ip "$(echo "$ip" | grep -vE '^(0(\.\d+){3}|::)$')"
+	json_add_string dest_port "$port"
+	json_close_object
 }
 
 log() {
@@ -108,7 +113,14 @@ start_service() {
 		# configure firewall
 		json_add_array firewall
 			# meta l4proto %s th dport %s counter accept comment "!%s: accept server instance [%s]"
-			add_firewall ${config_files//-c/}
+			config_foreach add_firewall "listener" "$(yq -ptoml eval-all '
+				[
+					select((.listeners // []) | length > 0)
+					| .listeners[]
+				] | unique
+				| map( tostring | @sh )
+				| join(" ")
+			' ${config_files//-c/} 2>/dev/null)"
 		json_close_array
 		procd_close_data
 
