@@ -334,12 +334,13 @@ const methods = {
 	},
 
 	write_configs: {
-		args: { configs: 'configs' },
+		args: { configs: 'configs', invert: 'invert' },
 		call: function(req) {
 			const configs = json(trim(req.args?.configs || '[]'));
+			const invert = (req.args?.invert || false) === 'true';
 
-			if (isEmpty(configs))
-				return { result: false, error: 'empty configs' };
+			if (type(configs) !== 'array')
+				return { result: false, error: 'illegal configs type' };
 
 			mkdir(RUN_DIR);
 
@@ -365,7 +366,7 @@ const methods = {
 			}
 
 			for (let rm in (glob(RUN_DIR + '/*.toml') || []))
-				if (!(rm in keeps))
+				if (invert ^ !(rm in keeps))
 					system(`rm -f "${rm}"`);
 
 			if (length(errors) > 0)
