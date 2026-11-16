@@ -1,0 +1,55 @@
+From c9e467542e4bbf2e2de2835575c91c0d63ba3f24 Mon Sep 17 00:00:00 2001
+From: Anya Lin <hukk1996@gmail.com>
+Date: Mon, 16 Nov 2026 8:02:52 +0000
+Subject: [PATCH] EASYTIER_GIT_HASH
+
+---
+ easytier/build/main.rs           |  5 +++++
+ easytier/src/common/constants.rs | 21 +++++++++++++++------
+ 2 files changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/easytier/build/main.rs b/easytier/build/main.rs
+index 0cc35a26..c849bd90 100644
+--- a/easytier/build/main.rs
++++ b/easytier/build/main.rs
+@@ -78,6 +78,11 @@ fn git_output(args: &[&str]) -> Option<String> {
+ }
+ 
+ fn set_git_commit_date() {
++    let hash = env::var("EASYTIER_GIT_HASH").unwrap_or_default();
++
++    println!("cargo:rustc-env=EASYTIER_GIT_HASH={hash}");
++    println!("cargo:rerun-if-env-changed=EASYTIER_GIT_HASH");
++
+     let suffix = git_output(&["log", "-1", "--format=%cd", "--date=format-local:%Y%m%d"])
+         .map(|date| format!("-{date}"))
+         .unwrap_or_default();
+diff --git a/easytier/src/common/constants.rs b/easytier/src/common/constants.rs
+index 3a2d3a07..b55fda64 100644
+--- a/easytier/src/common/constants.rs
++++ b/easytier/src/common/constants.rs
+@@ -11,9 +11,18 @@ pub const HMAC_SECRET_DIGEST: bool = false;
+ 
+ pub const WIN_SERVICE_WORK_DIR_REG_KEY: &str = "SOFTWARE\\EasyTier\\Service\\WorkDir";
+ 
+-pub const EASYTIER_VERSION: &str = git_version::git_version!(
+-    args = ["--abbrev=8", "--always", "--dirty=~"],
+-    prefix = concat!(env!("CARGO_PKG_VERSION"), "-"),
+-    suffix = env!("EASYTIER_COMMIT_DATE"),
+-    fallback = env!("CARGO_PKG_VERSION")
+-);
++pub const EASYTIER_VERSION: &str = if env!("EASYTIER_GIT_HASH").is_empty() {
++    git_version::git_version!(
++        args = ["--abbrev=8", "--always", "--dirty=~"],
++        prefix = concat!(env!("CARGO_PKG_VERSION"), "-"),
++        suffix = env!("EASYTIER_COMMIT_DATE"),
++        fallback = env!("CARGO_PKG_VERSION")
++    )
++} else {
++    concat!(
++        env!("CARGO_PKG_VERSION"),
++        "-",
++        env!("EASYTIER_GIT_HASH"),
++        env!("EASYTIER_COMMIT_DATE")
++    )
++};

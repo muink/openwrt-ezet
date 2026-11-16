@@ -60,7 +60,8 @@ include $(INCLUDE_DIR)/package.mk
 include $(TOPDIR)/feeds/packages/lang/rust/rust-package.mk
 
 CARGO_PKG_VARS+= \
-	PROTOC=$(STAGING_DIR_HOSTPKG)/bin/protoc
+	PROTOC=$(STAGING_DIR_HOSTPKG)/bin/protoc \
+	EASYTIER_GIT_HASH=$(shell printf '%.8s' '$(PKG_UPSTREAM_GITHASH)')
 
 # GitHub codeload archives contain a single top-level EasyTier-<version>
 # directory. Strip it so the source is placed directly in PKG_BUILD_DIR.
