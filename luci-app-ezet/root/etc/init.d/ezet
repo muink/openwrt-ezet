@@ -33,15 +33,20 @@ add_firewall() {
 	[ "$type" = "listeners" ] || return 0
 	eval "echo $used_uris" | grep -q "$uri" || return 0
 
-	local ip port
+	local proto ip port
 	eval "$(echo "$uri" \
-		| sed -En "s|^[^:]+:/{0,2}\[?([[:xdigit:]:.]+)\]?:(\d+)|ip='\1';port='\2';|p")"
+		| sed -En "s|^([^:]+):/{0,2}\[?([[:xdigit:]:.]+)\]?:(\d+)|proto='\1';ip='\2';port='\3';|p")"
+	case "$proto" in
+		faketcp|ws|wss) proto=tcp ;;
+		wg|quic)        proto=udp ;;
+		*)              proto='' ;;
+	esac
 	json_add_object ''
 	json_add_string type rule
 	json_add_string target ACCEPT
 	json_add_string name "$1"
 	#json_add_string family '' # '' = IPv4 and IPv6
-	json_add_string proto 'tcp udp'
+	json_add_string proto "${proto:-tcp udp}"
 	json_add_string direction in
 	json_add_string src "*"
 	#json_add_string dest '' # '' = input
