@@ -369,11 +369,13 @@ return view.extend({
 		so.password = true;
 		so.validate = L.bind(ez.validateBase64Key, so, 44);
 		so.rmempty = false;
+		so.retain = true;
 		so.depends('secure_mode', '1');
 		so.modalonly = true;
 
 		so = ss.taboption('field_secure', ez.CopyValue, 'local_public_key', _('Client public key'),
 			_('Base64 encoded X25519 public key.'));
+		so.retain = true;
 		so.depends('secure_mode', '1');
 		so.modalonly = true;
 
@@ -531,9 +533,16 @@ return view.extend({
 		so.value('mapped_listeners', _('Mapped-listeners'));
 		so.textvalue = ez.textvalue2Value;
 		so.validate = function(section_id, value) {
-			if (value === 'mapped_listeners') {
-				const host = this.section.getOption('host').formvalue(section_id);
+			const UIEl = this.section.getUIElement(section_id, 'host');
+			const hostEl = UIEl.node.querySelector('input');
+			const host = UIEl.getValue();
 
+			if (value === 'listeners') {
+				hostEl.placeholder = '::';
+				if (ez.stubValidator.apply('hostname', host) === true)
+					return _('Expecting: %s').format(_('valid IPv4/IPv6 address'));
+			} else if (value === 'mapped_listeners') {
+				hostEl.placeholder = 'host';
 				if (ez.stubValidator.apply('hostname', host) === true)
 					return true;
 

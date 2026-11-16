@@ -10,9 +10,9 @@ config core 'global'
 
 config web 'console'
 
-config instance 'instance_easytier'
-	option label 'easytier'
-	option network_name 'easytier'
+config instance 'instance_easytiernode'
+	option label 'easytiernode'
+	option network_name 'easytiernode'
 	option network_secret ''
 	option external_node 'peer_DreamLife'
 
@@ -39,7 +39,7 @@ config listener 'listener_TCP'
 config listener 'listener_UDP'
 	option label 'UDP'
 	option type 'listeners'
-	option uri 'udp://localhost:11010'
+	option uri 'udp://0.0.0.0:11010'
 
 config listener 'listener_WireGuard'
 	option label 'WireGuard'
