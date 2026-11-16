@@ -157,7 +157,7 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		} : null,
 
 		/* Peers settings */
-		peer: filter([...(get_peers(cfg.peers) || []), get_peers(cfg.external_node)], v => !isEmpty(v)),
+		peer: filter(get_peers(cfg.peers) || [], v => !isEmpty(v)),
 		//// proxy_network: cfg.proxy_networks,
 
 		/* Listener settings */

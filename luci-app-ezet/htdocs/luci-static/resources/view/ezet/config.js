@@ -159,17 +159,6 @@ function renderURIs(s, uciconfig, isServer = false) {
 	}
 }
 
-function validateTotalPeers(section_id, value) {
-	const peers = this.section.getOption('peers').formvalue(section_id);
-	const external_node = this.section.getOption('external_node').formvalue(section_id);
-	value = peers.concat(external_node).filter(Boolean);
-
-	if (value.length == 0)
-		return _('Expecting: %s').format(_('least one peer required'));
-
-	return true;
-}
-
 return view.extend({
 	load() {
 		return Promise.all([
@@ -264,8 +253,7 @@ return view.extend({
 		so.validate = function(section_id, value) {
 			const secure_mode = this.getUIElement(section_id).node.querySelector('input');
 			const peers = this.section.getOption('peers').formvalue(section_id);
-			const external_node = this.section.getOption('external_node').formvalue(section_id);
-			const peers_public_key = peers.concat(external_node).filter(Boolean)
+			const peers_public_key = peers.filter(Boolean)
 				.map(sid => uci.get(this.config, sid, 'peer_public_key')).filter(Boolean);
 
 			// Force enabled
@@ -331,27 +319,15 @@ return view.extend({
 			_('Auto-obtain a IPv6 GUA from a peer that shares its IPv6 subnet.'));
 		so.default = so.disabled;
 
-		so = ss.taboption('field_Base', form.MultiValue, 'peers', _('Trusted peers'));
+		so = ss.taboption('field_Base', form.MultiValue, 'peers', _('Peers'));
 		so.value('', _('-- Please choose --'));
 		so.load = function(section_id) {
 			return ez.loadChoices.call(this, [
 				['', _('-- Please choose --')],
-				...ez.loadChoicesGetMap(this.config, 'peer', {type: 'private'})
+				...ez.loadChoicesGetMap(this.config, 'peer')
 			], section_id);
 		}
-		so.validate = validateTotalPeers;
-		so.modalonly = true;
-
-		so = ss.taboption('field_Base', form.ListValue, 'external_node', _('Public shared node'),
-			_('Use a public shared node to discover peers.'));
-		so.value('', _('none'));
-		so.load = function(section_id) {
-			return ez.loadChoices.call(this, [
-				['', _('none')],
-				...ez.loadChoicesGetMap(this.config, 'peer', {type: 'public'})
-			], section_id);
-		}
-		so.validate = validateTotalPeers;
+		so.rmempty = false;
 		so.modalonly = true;
 
 		/** Secure fields **/
@@ -484,11 +460,6 @@ return view.extend({
 		so = ss.option(form.Flag, 'enabled', _('Enable'));
 		so.default = so.enabled;
 		so.editable = true;
-
-		so = ss.option(form.ListValue, 'type', _('Type'));
-		so.value('private', _('Private trusted'));
-		so.value('public', _('Publicly shared'));
-		so.textvalue = ez.textvalue2Value;
 
 		so = ss.option(form.Value, 'peer_public_key', _('Peer public key'),
 			_('Base64 encoded X25519 public key.'));
