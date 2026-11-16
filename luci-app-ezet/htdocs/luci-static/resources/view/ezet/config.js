@@ -191,12 +191,6 @@ return view.extend({
 		so.default = so.disabled;
 
 		so = ss.option(form.ListValue, 'console_log_level', _('Console log level'));
-		so.default = 'info';
-		ez.log_levels.forEach((res) => {
-			so.value.apply(so, res);
-		})
-
-		so = ss.option(form.ListValue, 'file_log_level', _('File log level'));
 		so.default = 'warn';
 		ez.log_levels.forEach((res) => {
 			so.value.apply(so, res);

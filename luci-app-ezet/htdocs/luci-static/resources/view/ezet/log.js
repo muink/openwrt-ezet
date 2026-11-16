@@ -37,11 +37,11 @@ function getRuntimeLog(name, option_index, section_id, in_table) {
 			break;
 		case 'easytier-core':
 			section = 'global';
-			option = 'file_log_level';
+			option = 'console_log_level';
 			break;
 		case 'easytier-web':
-			section = 'web';
-			option = 'file_log_level';
+			section = 'console';
+			option = 'console_log_level';
 			break;
 	}
 

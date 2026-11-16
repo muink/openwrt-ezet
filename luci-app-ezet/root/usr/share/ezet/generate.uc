@@ -33,8 +33,8 @@ const uciinst = 'instance',
 /* Global options */
 const machine_id = uci.get(uciconf, uciglobal, 'machine_id') || ubus.call('luci.ezet', 'get_host_info')?.machine_id,
       hostname = uci.get(uciconf, uciglobal, 'hostname') || ubus.call('luci.ezet', 'get_host_info')?.hostname,
-      console_log_level = uci.get(uciconf, uciglobal, 'console_log_level') || 'info',
-      file_log_level = uci.get(uciconf, uciglobal, 'file_log_level') || 'warn',
+      console_log_level = uci.get(uciconf, uciglobal, 'console_log_level') || 'warn',
+      file_log_level = uci.get(uciconf, uciglobal, 'file_log_level') || 'off',
       file_log_size = strToInt(uci.get(uciconf, uciglobal, 'file_log_size')) ?? 5,
       file_log_count = strToInt(uci.get(uciconf, uciglobal, 'file_log_count')) ?? 1,
       auto_ipv6_gua_prefix = ubus.call('luci.ezet', 'detect_ipv6_gua_prefix').result?.pd;
