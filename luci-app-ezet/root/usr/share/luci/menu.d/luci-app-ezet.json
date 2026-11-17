@@ -20,10 +20,18 @@
 	},
 	"admin/vpn/ezet/config": {
 		"title": "Config",
-		"order": 40,
+		"order": 20,
 		"action": {
 			"type": "view",
 			"path": "ezet/config"
+		}
+	},
+	"admin/vpn/ezet/web": {
+		"title": "Web",
+		"order": 40,
+		"action": {
+			"type": "view",
+			"path": "ezet/web"
 		}
 	},
 	"admin/vpn/ezet/log": {
