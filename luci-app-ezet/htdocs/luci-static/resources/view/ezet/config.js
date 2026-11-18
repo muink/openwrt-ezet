@@ -196,6 +196,19 @@ return view.extend({
 			so.value.apply(so, res);
 		})
 
+		so = ss.option(form.Value, 'config_server', _('Config server'),
+			_('Retrieve configuration distributed by the config-server.'));
+		so.placeholder = 'udp://127.0.0.1:22020/admin';
+		so.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const config_server_protocol = uci.get(data[0], 'console', 'config_server_protocol')
+			const config_server_port = uci.get(data[0], 'console', 'config_server_port')
+
+			widget.placeholder = `${config_server_protocol}://localhost:${config_server_port}/admin`;
+
+			return ez.validateUrl.apply(this, arguments);
+		}
+
 		so = ss.option(form.Value, 'machine_id', _('Machine ID'));
 		so.placeholder = hostInfo.machine_id;
 		so.validate = ez.validateUUID;

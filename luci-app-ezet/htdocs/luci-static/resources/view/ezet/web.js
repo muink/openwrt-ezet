@@ -33,10 +33,12 @@ return view.extend({
 		o = s.taboption('field_general', form.Flag, 'web_enabled', _('Enable'));
 		o.default = o.disabled;
 		if (!features.web_version){
-			o.description = _('To enable, you need to install <code>easytier-web</code>.');
+			o.description = _('To enable, you need to install %s.')
+				.format('<code>easytier-web</code>');
 			o.readonly = true;
 			uci.set(data[0], o.section.section, o.option, '');
-			uci.save();
+			uci.save()
+				.then(L.bind(o.map.reset, o.map));
 		}
 
 		o = s.taboption('field_general', form.MultiValue, 'auto_firewall', _('Firewall'),
@@ -44,7 +46,15 @@ return view.extend({
 			_('For HTTP, recommended to use a reverse proxy.'));
 		o.value('config_server', _('Config server'));
 		o.value('api_server', _('API server'));
-		o.value('web_server', _('Frontend server'));
+		if (features.embed_frontend)
+			o.value('web_server', _('Frontend server'));
+		else {
+			uci.set(data[0], o.section.section, o.option,
+				(uci.get(data[0], o.section.section, o.option) || []).filter(e => e !== 'web_server')
+			);
+			uci.save()
+				.then(L.bind(o.map.reset, o.map));
+		}
 
 		o = s.taboption('field_general', form.ListValue, 'console_log_level', _('Console log level'));
 		o.default = 'warn';
@@ -97,7 +107,6 @@ return view.extend({
 			_('Must match the %s&%s.').format(_('Config server listen protocol'), _('port')));
 		o.placeholder = 'udp://cfg.my-domain.lan:22020';
 		o.validate = ez.validateUrl;
-		o.retain = true;
 		o.rmempty = false;
 		o.depends('as_gateway', '1');
 
@@ -136,8 +145,14 @@ return view.extend({
 		o = s.taboption('field_webhook', form.Value, 'web_instance_api_base_url', _('Web instance API base URL'),
 			_('Reachable base URL for this <code>easytier-web</code> instance\'s internal REST API.'));
 		o.placeholder = 'http://api.my-domain.lan:11211/';
-		o.validate = ez.validateUrl;
-		o.retain = true;
+		o.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const api_server_port = this.section.getOption('api_server_port').formvalue(section_id);
+
+			widget.placeholder = `http://api.my-domain.lan:${api_server_port}/`;
+
+			return ez.validateUrl.apply(this, arguments);
+		}
 		o.depends({webhook_url: /.+/});
 		*/
 
@@ -155,25 +170,43 @@ return view.extend({
 		o.rmempty = false;
 
 		// Frontend
-		o = s.taboption('field_webserv', form.Flag, 'no_web', _('Disable web dashboard'));
+		o = s.taboption('field_webserv', form.Value, 'api_host', _('Preset API host'),
+			_('Preset API server URL used by the web frontend to connect to.'));
+		o.placeholder = 'http://127.0.0.1:11211';
+		o.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const api_server_port = this.section.getOption('api_server_port').formvalue(section_id);
+
+			widget.placeholder = `http://localhost:${api_server_port}`;
+
+			return ez.validateUrl.apply(this, arguments);
+		}
+		o.depends({no_web: '1', '!reverse': true});
+
+		o = s.taboption('field_webserv', form.Flag, 'no_web', _('Disable web dashboard'),
+			_('Disable web frontend.'));
 		o.default = o.disabled;
+		if (!features.embed_frontend) {
+			o.description = _('To enable, you need to install %s with %s feature.')
+				.format('<code>easytier-web</code>', '<code>embed</code>');
+			o.readonly = true;
+			uci.set(data[0], o.section.section, o.option, '1');
+			uci.save()
+				.then(L.bind(o.map.reset, o.map));
+		}
 
 		o = s.taboption('field_webserv', form.Value, 'web_server_addr', _('Frontend listen address'),
 			_('Only effective when the %s/%s differs from the API listen.')
 		.format(_('Frontend listen address'), _('port')));
 		o.datatype = 'ipaddr(1)';
 		o.placeholder = '::';
+		o.retain = true;
 		o.depends({no_web: '1', '!reverse': true});
 
 		o = s.taboption('field_webserv', form.Value, 'web_server_port', _('Frontend listen port'),
 			_('Leave empty to use the %s.').format(_('API listen port')));
 		o.datatype = 'port';
-		o.depends({no_web: '1', '!reverse': true});
-
-		o = s.taboption('field_webserv', form.Value, 'api_host', _('Preset API host'),
-			_('Preset API server URL used by the web frontend to connect to.'));
-		o.placeholder = 'http://127.0.0.1:11211';
-		o.validate = ez.validateUrl;
+		o.retain = true;
 		o.depends({no_web: '1', '!reverse': true});
 
 		/* Authentication fields */
@@ -240,8 +273,14 @@ return view.extend({
 		o = s.taboption('field_authent', form.Value, 'oidc_redirect_url', _('OIDC callback URL'),
 			_('Must exactly match the callback URL registered with the identity provider.'));
 		o.placeholder = 'http://api.my-domain.lan:11211/api/v1/auth/oidc/callback';
-		o.validate = ez.validateUrl;
-		o.retain = true;
+		o.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const api_server_port = this.section.getOption('api_server_port').formvalue(section_id);
+
+			widget.placeholder = `http://api.my-domain.lan:${api_server_port}/api/v1/auth/oidc/callback`;
+
+			return ez.validateUrl.apply(this, arguments);
+		}
 		o.rmempty = false;
 		o.depends({oidc_issuer_url: /.+/});
 
@@ -250,10 +289,16 @@ return view.extend({
 			_('The frontend URL to redirect to after backend successful authentication.') + '</br>' +
 			_('Required when the frontend and API are deployed separately.'));
 		o.placeholder = 'http://dash.my-domain.lan:11211/';
-		o.validate = ez.validateUrl;
-		o.retain = true;
+		o.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const api_server_port = this.section.getOption('api_server_port').formvalue(section_id);
+			const web_server_port = this.section.getOption('web_server_port').formvalue(section_id);
+
+			widget.placeholder = `http://dash.my-domain.lan:${web_server_port || api_server_port}/`;
+
+			return ez.validateUrl.apply(this, arguments);
+		}
 		o.rmempty = false;
-		// @o.depends({oidc_issuer_url: /.+/, features["non-embed"]: true});
 		o.depends({oidc_issuer_url: /.+/, no_web: '1'});
 		o.depends({oidc_issuer_url: /.+/, web_server_addr: /.+/});
 		o.depends({oidc_issuer_url: /.+/, web_server_port: /.+/});

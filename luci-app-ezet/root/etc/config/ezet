@@ -10,6 +10,7 @@ config core 'global'
 
 config web 'console'
 	option console_log_level 'warn'
+	option file_log_level 'off'
 	option config_server_protocol 'udp'
 	option config_server_port '22020'
 	option api_server_port '11211'

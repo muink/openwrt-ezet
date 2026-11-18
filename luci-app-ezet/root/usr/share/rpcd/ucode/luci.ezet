@@ -230,6 +230,8 @@ const methods = {
 				} else features[`${type}_version`] = null;
 			}
 
+			if (features.web_version)
+				features.embed_frontend = system(`easytier-web -h | grep -q '^\\s*\\-\\-no-web\\b'`) === 0;
 			features.has_tun = hasKernelModule('tun.ko') || access('/etc/modules.d/30-tun');
 
 			return features;
