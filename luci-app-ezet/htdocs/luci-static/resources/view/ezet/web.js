@@ -107,8 +107,18 @@ return view.extend({
 			_('Use a LAN, VPN, or public address reachable by the nodes.') + '</br>' +
 			_('Must match the %s&%s.').format(_('Config server listen protocol'), _('port')));
 		o.placeholder = 'udp://cfg.my-domain.lan:22020';
-		o.validate = ez.validateUrl;
-		o.rmempty = false;
+		o.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const config_server_protocol = this.section.getOption('config_server_protocol').formvalue(section_id);
+			const config_server_port = this.section.getOption('config_server_port').formvalue(section_id);
+
+			widget.placeholder = `${config_server_protocol}://cfg.my-domain.lan:${config_server_port}`;
+
+			if (!value)
+				return _('Expecting: %s').format(_('non-empty value'));
+
+			return ez.validateUrl.apply(this, arguments);
+		}
 		o.depends('as_gateway', '1');
 
 		o = s.taboption('field_cfgserv', form.Flag, 'gateway_relay_data', _('Gateway relay data'),
@@ -173,12 +183,15 @@ return view.extend({
 		// Frontend
 		o = s.taboption('field_webserv', form.Value, 'api_host', _('Preset API host'),
 			_('Preset API server URL used by the web frontend to connect to.'));
-		o.placeholder = 'http://127.0.0.1:11211';
+		o.placeholder = 'http://api.my-domain.lan:11211';
 		o.validate = function(section_id, value) {
 			const widget = this.getUIElement(section_id).node.querySelector('input');
 			const api_server_port = this.section.getOption('api_server_port').formvalue(section_id);
 
-			widget.placeholder = `http://localhost:${api_server_port}`;
+			widget.placeholder = `http://api.my-domain.lan:${api_server_port}`;
+
+			if (!value)
+				return _('Expecting: %s').format(_('non-empty value'));
 
 			return ez.validateUrl.apply(this, arguments);
 		}
@@ -280,9 +293,11 @@ return view.extend({
 
 			widget.placeholder = `http://api.my-domain.lan:${api_server_port}/api/v1/auth/oidc/callback`;
 
+			if (!value)
+				return _('Expecting: %s').format(_('non-empty value'));
+
 			return ez.validateUrl.apply(this, arguments);
 		}
-		o.rmempty = false;
 		o.depends({oidc_issuer_url: /.+/});
 
 		// Frontend
@@ -297,9 +312,11 @@ return view.extend({
 
 			widget.placeholder = `http://dash.my-domain.lan:${web_server_port || api_server_port}/`;
 
+			if (!value)
+				return _('Expecting: %s').format(_('non-empty value'));
+
 			return ez.validateUrl.apply(this, arguments);
 		}
-		o.rmempty = false;
 		o.depends({oidc_issuer_url: /.+/, no_web: '1'});
 		o.depends({oidc_issuer_url: /.+/, web_server_addr: /.+/});
 		o.depends({oidc_issuer_url: /.+/, web_server_port: /.+/});

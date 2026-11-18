@@ -34,7 +34,7 @@ const console_log_level = getConsole('console_log_level') || 'warn',
       api_server_port = strToInt(getConsole('api_server_port')) || 11211,
       web_server_addr = getConsole('web_server_addr') || '::', // 0.0.0.0
       web_server_port = strToInt(getConsole('web_server_port')), // same with api_server_port
-      api_host = getConsole('api_host') || `http://localhost:${api_server_port}`, // http://127.0.0.1:11211
+      api_host = getConsole('api_host'), // http://api.my-domain.lan:11211
       file_log_level = getConsole('file_log_level') || 'off';
 
 /* UCI config END */
