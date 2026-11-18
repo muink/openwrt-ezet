@@ -1,0 +1,13 @@
+show peers info
+
+Usage: easytier-cli peer [COMMAND]
+
+Commands:
+  list                 List connected peers
+  ipv6                 Show public IPv6 address information
+  list-foreign         List foreign networks discovered by this instance
+  list-global-foreign  List global foreign networks from the peer center
+  help                 Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

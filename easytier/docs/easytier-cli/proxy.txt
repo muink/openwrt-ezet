@@ -1,0 +1,6 @@
+show tcp/kcp proxy status
+
+Usage: easytier-cli proxy
+
+Options:
+  -h, --help  Print help

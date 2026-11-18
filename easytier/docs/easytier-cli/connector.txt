@@ -1,0 +1,14 @@
+manage connectors
+
+Usage: easytier-cli connector [OPTIONS] [COMMAND]
+
+Commands:
+  add     Add a connector
+  remove  Remove a connector
+  list    List connectors
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -i, --ipv4 <IPV4>    filter connectors by virtual IPv4 address
+  -p, --peers <PEERS>  filter connectors by peer URL
+  -h, --help           Print help

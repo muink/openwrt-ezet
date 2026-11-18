@@ -1,0 +1,6 @@
+show global peers info
+
+Usage: easytier-cli peer-center
+
+Options:
+  -h, --help  Print help

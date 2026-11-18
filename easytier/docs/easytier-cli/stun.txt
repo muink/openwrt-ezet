@@ -1,0 +1,6 @@
+do stun test
+
+Usage: easytier-cli stun
+
+Options:
+  -h, --help  Print help

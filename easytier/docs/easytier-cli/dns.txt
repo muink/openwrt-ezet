@@ -1,0 +1,12 @@
+inspect and update saved DNS configuration
+
+Usage: easytier-cli dns <COMMAND>
+
+Commands:
+  show   Show this instance's saved DNS configuration
+  set    Patch DNS from a file containing only [dns] and [[dns.zone]]
+  clear  Clear this instance's static records, preserving its default domain
+  help   Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help

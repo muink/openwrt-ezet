@@ -1,0 +1,9 @@
+generate shell completions
+
+Usage: easytier-cli gen-autocomplete <SHELL>
+
+Arguments:
+  <SHELL>  [possible values: bash, elvish, fish, powershell, zsh, nu]
+
+Options:
+  -h, --help  Print help

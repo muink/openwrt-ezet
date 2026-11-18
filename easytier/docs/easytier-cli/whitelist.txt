@@ -1,0 +1,14 @@
+manage TCP/UDP whitelist
+
+Usage: easytier-cli whitelist [COMMAND]
+
+Commands:
+  set-tcp    Set TCP port whitelist
+  set-udp    Set UDP port whitelist
+  clear-tcp  Clear TCP whitelist
+  clear-udp  Clear UDP whitelist
+  show       Show current whitelist configuration
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
