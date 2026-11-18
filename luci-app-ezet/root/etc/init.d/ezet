@@ -130,7 +130,7 @@ start_service() {
 		core_conf="$(ucode -S "$SDL_DIR/generate.uc" "$@" 2>>"$LOG_PATH")"
 		core_opti="$(echo "$core_conf" | yq -pj '
 			.options | to_entries
-			| map( "--" + .key + " " + (.value | tostring | @sh) )
+			| map( "--" + .key + (if .value == true then "" else " " + (.value | tostring | @sh) end) )
 			| join(" ")
 		')"
 		core_conf="$(jsonfilter -qs "$core_conf" -e '@.configs')"
@@ -191,7 +191,7 @@ start_service() {
 		# Generate/Validate web configs
 		web_opti="$(ucode -S "$SDL_DIR/generate-web.uc" 2>>"$LOG_PATH" | yq -pj '
 			.options | to_entries
-			| map( "--" + .key + " " + (.value | tostring | @sh) )
+			| map( "--" + .key + (if .value == true then "" else " " + (.value | tostring | @sh) end) )
 			| join(" ")
 		')"
 
@@ -252,9 +252,9 @@ stop_core() {
 		done
 		ubus call luci.ezet write_configs '{"configs":
 			"'"$(json_dump | jsonfilter -qe '@.arr' | sed 's|"|\\\"|g')"'",
-			"invert":"true"}' # rm $@.toml
+			"invert":"true"}' >/dev/null # rm $@.toml
 	else
-		ubus call luci.ezet write_configs '{"configs":""}' # rm *.toml
+		ubus call luci.ezet write_configs '{"configs":""}' >/dev/null # rm *.toml
 	fi
 
 	log "Service easytier-core stopped."

@@ -32,7 +32,7 @@ const uciinst = 'instance',
       ucistun = 'stun_server';
 
 /* Global options */
-const web_enabled = strToBool(uci.get(uciconf, uciconsole, 'web_enabled')),
+const web_enabled = strToBool(uci.get(uciconf, uciezet, 'web_enabled')),
       config_server_protocol = uci.get(uciconf, uciconsole, 'config_server_protocol') || 'udp',
       config_server_port = strToInt(uci.get(uciconf, uciconsole, 'config_server_port')) || 22020;
 
@@ -85,8 +85,8 @@ const options = removeBlankAttrs({
 	/* Config settings */
 	"config-server": web_enabled ? config_server : null,
 	"machine-id": machine_id,
-	"state-dir": `${EZ_DIR}/${uciinst}`,
-	//// "config-file": ,
+	"state-dir": EZ_DIR,
+	// "config-file": ,
 	"config-dir": `${EZ_DIR}/config`,
 	//// "shared-runtime": ,
 	//// "check-config": ,

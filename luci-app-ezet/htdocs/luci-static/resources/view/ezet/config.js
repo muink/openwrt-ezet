@@ -326,7 +326,8 @@ return view.extend({
 			_('Auto-obtain a IPv6 GUA from a peer that shares its IPv6 subnet.'));
 		so.default = so.disabled;
 
-		so = ss.taboption('field_Base', form.MultiValue, 'peers', _('Peers'));
+		so = ss.taboption('field_Base', form.MultiValue, 'peers', _('Peers'),
+			_('Bootstrap peers.'));
 		so.value('', _('-- Please choose --'));
 		so.load = function(section_id) {
 			return ez.loadChoices.call(this, [
@@ -432,7 +433,8 @@ return view.extend({
 		so.depends({no_listener: '1', '!reverse': true});
 		so.modalonly = true;
 
-		so = ss.taboption('field_server', form.MultiValue, 'mapped_listeners', _('Mapped-listeners'));
+		so = ss.taboption('field_server', form.MultiValue, 'mapped_listeners', _('Mapped-listeners'),
+			_('Manually specify the public address of the listener.'));
 		so.value('', _('-- Please choose --'));
 		so.load = function(section_id) {
 			return ez.loadChoices.call(this, [

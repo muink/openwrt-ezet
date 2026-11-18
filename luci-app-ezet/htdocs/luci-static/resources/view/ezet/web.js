@@ -31,6 +31,7 @@ return view.extend({
 
 		/* General fields */
 		o = s.taboption('field_general', form.Flag, 'web_enabled', _('Enable'));
+		o.ucisection = 'config';
 		o.default = o.disabled;
 		if (!features.web_version){
 			o.description = _('To enable, you need to install %s.')
