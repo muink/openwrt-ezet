@@ -130,9 +130,14 @@ start_service() {
 		core_conf="$(ucode -S "$SDL_DIR/generate.uc" "$@" 2>>"$LOG_PATH")"
 		core_opti="$(echo "$core_conf" | yq -pj '
 			.options | to_entries
-			| map( "--" + .key + (if .value == true then "" else " " + (.value | tostring | @sh) end) )
+			| map( "--" + .key + ( (.value | select(. != true) | (" " + (to_string | @sh)) ) // "") )
 			| join(" ")
 		')"
+		#core_opti="$(echo "$core_conf" | yq -pj '
+		#	.options | to_entries
+		#	| map( "--" + .key + (if .value == true then "" else " " + (.value | tostring | @sh) end) )
+		#	| join(" ")
+		#')" # Required v4.54.1
 		core_conf="$(jsonfilter -qs "$core_conf" -e '@.configs')"
 
 		config_files="$(ubus call luci.ezet write_configs '{"configs":"'"${core_conf//\"/\\\"}"'"}' \
@@ -191,9 +196,14 @@ start_service() {
 		# Generate/Validate web configs
 		web_opti="$(ucode -S "$SDL_DIR/generate-web.uc" 2>>"$LOG_PATH" | yq -pj '
 			.options | to_entries
-			| map( "--" + .key + (if .value == true then "" else " " + (.value | tostring | @sh) end) )
+			| map( "--" + .key + ( (.value | select(. != true) | (" " + (to_string | @sh)) ) // "") )
 			| join(" ")
 		')"
+		#web_opti="$(ucode -S "$SDL_DIR/generate-web.uc" 2>>"$LOG_PATH" | yq -pj '
+		#	.options | to_entries
+		#	| map( "--" + .key + (if .value == true then "" else " " + (.value | tostring | @sh) end) )
+		#	| join(" ")
+		#')" # Required v4.54.1
 
 		echo > "$RUN_DIR/easytier-web.log"
 
