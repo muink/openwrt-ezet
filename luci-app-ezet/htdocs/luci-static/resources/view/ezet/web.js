@@ -25,7 +25,9 @@ return view.extend({
 		s.render = function () {
 			poll.add(function() {
 				return ez.getServiceStatus('easytier-web', 'running').then((isRunning) => {
-					ez.updateStatus(document.getElementById('_web_bar'), isRunning, 'easytier-web', true);
+					return ez.getDashURL('easytier-web').then((dashURL) => {
+						ez.updateStatus(document.getElementById('_web_bar'), isRunning ? { url: dashURL } : false, 'easytier-web', true);
+					});
 				});
 			});
 

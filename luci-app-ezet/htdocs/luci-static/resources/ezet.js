@@ -313,6 +313,31 @@ function getServiceStatus(instance, key) {
 		});
 }
 
+function getDashURL(instance) {
+	return getServiceStatus(instance, 'command').then((cmd) => {
+		if (isEmpty(cmd))
+			return '';
+
+		cmd = Object.assign({}, ...cmd.join(' ').split('--')
+			.map((s) => {
+				const match = s.match(/^(no-web|api-server-addr|api-server-port|web-server-addr|web-server-port) (\S+)?/)
+
+				if (match)
+					return Object.fromEntries([[match[1], match[2] ?? true]]);
+				else
+					return null;
+			}).filter(Boolean));
+
+		if (cmd["no-web"])
+			return '';
+
+		const host = (cmd["web-server-addr"] || cmd["api-server-addr"] || '').replace(/^(0(\.\d+){3}|::)$/, '') || window.location.hostname;
+		const port = cmd["web-server-port"] || cmd["api-server-port"] || 11211;
+
+		return 'http://%s:%s/'.format(host, port);
+	});
+}
+
 function ipv6CidrToRange(cidr) {
 	const [addr, prefix] = cidr.split('/');
 	const words = validation.parseIPv6(addr);
@@ -393,18 +418,36 @@ function loadChoicesGetMap(uciconfig, sectiontype, options = {}) {
 }
 
 function renderStatus(elemId, isRunning, instance, noGlobal) {
+	const visible = isRunning && isRunning.url;
+
 	return E([
 		E('button', {
 			class: 'cbi-button cbi-button-apply' + (noGlobal ? ' hidden' : ''),
 			click: ui.createHandlerFn(this, handleReload, instance)
 		}, [ _('Reload') ]),
-		updateStatus(E('span', { id: elemId, style: 'border: unset; font-style: italic; font-weight: bold' }), isRunning ? true : false)
+		updateStatus(E('span', { id: elemId, style: 'border: unset; font-style: italic; font-weight: bold' }), isRunning ? true : false),
+		E('a', {
+			class: 'cbi-button cbi-button-apply %s'.format(visible ? '' : 'hidden'),
+			href: isRunning.url,
+			target: '_blank',
+			rel: 'noreferrer noopener'
+		}, [ _('Open Dashboard') ])
 	]);
 }
 function updateStatus(node, isRunning, instance, noGlobal) {
 	if (node) {
 		node.style.color = isRunning ? 'green' : 'red';
 		node.innerHTML = '&ensp;%s%s&ensp;'.format(noGlobal ? instance + ' ' : '', isRunning ? _('Running') : _('Not Running'));
+		/* Dashboard button */
+		if (node.nextSibling?.localName === 'a') {
+			const visible = isRunning && isRunning.url;
+			if (visible)
+				node.nextSibling.classList.remove('hidden');
+			else
+				node.nextSibling.classList.add('hidden');
+
+			node.nextSibling.href = isRunning.url;
+		}
 	}
 
 	return node;
@@ -575,6 +618,7 @@ return baseclass.extend({
 	isEmpty,
 	getFeatures,
 	getServiceStatus,
+	getDashURL,
 	ipv6CidrToRange,
 	ipv6RangeContains,
 	// load
