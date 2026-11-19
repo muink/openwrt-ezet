@@ -283,7 +283,7 @@ function getFeatures() {
 	return L.resolveDefault(callGetFeatures(), {});
 }
 
-function getServiceStatus(instance) {
+function getServiceStatus(instance, key) {
 	const conf = 'ezet';
 	const callServiceList = rpc.declare({
 		object: 'service',
@@ -294,11 +294,11 @@ function getServiceStatus(instance) {
 
 	return L.resolveDefault(callServiceList(conf), {})
 		.then((res) => {
-			let isRunning = false;
+			let value;
 			try {
-				isRunning = res[conf]['instances'][instance].running;
+				value = res[conf]['instances'][instance][key];
 			} catch (e) {}
-			return isRunning;
+			return value;
 		});
 }
 

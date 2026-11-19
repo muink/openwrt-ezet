@@ -181,7 +181,7 @@ return view.extend({
 		s = m.section(form.TypedSection);
 		s.render = function () {
 			poll.add(function() {
-				return ez.getServiceStatus('easytier-core').then((isRunning) => {
+				return ez.getServiceStatus('easytier-core', 'running').then((isRunning) => {
 					ez.updateStatus(document.getElementById('_core_bar'), isRunning, 'easytier-core', true);
 				});
 			});
