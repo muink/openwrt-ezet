@@ -1,5 +1,6 @@
 'use strict';
 'require form';
+'require poll';
 'require uci';
 'require view';
 
@@ -19,6 +20,21 @@ return view.extend({
 		let m, s, o;
 
 		m = new form.Map('ezet', _('Web Console'));
+
+		s = m.section(form.TypedSection);
+		s.render = function () {
+			poll.add(function() {
+				return ez.getServiceStatus('easytier-web').then((isRunning) => {
+					ez.updateStatus(document.getElementById('_web_bar'), isRunning, 'easytier-web', true);
+				});
+			});
+
+			return E('div', { class: 'cbi-section' }, [
+				E('p', [
+					ez.renderStatus('_web_bar', false, 'easytier-web', true)
+				])
+			]);
+		}
 
 		s = m.section(form.NamedSection, 'console', 'web');
 

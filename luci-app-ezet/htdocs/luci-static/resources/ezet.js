@@ -381,6 +381,24 @@ function loadChoicesGetMap(uciconfig, sectiontype, options = {}) {
 	return values;
 }
 
+function renderStatus(elemId, isRunning, instance, noGlobal) {
+	return E([
+		E('button', {
+			class: 'cbi-button cbi-button-apply' + (noGlobal ? ' hidden' : ''),
+			click: ui.createHandlerFn(this, handleReload, instance)
+		}, [ _('Reload') ]),
+		updateStatus(E('span', { id: elemId, style: 'border: unset; font-style: italic; font-weight: bold' }), isRunning ? true : false)
+	]);
+}
+function updateStatus(node, isRunning, instance, noGlobal) {
+	if (node) {
+		node.style.color = isRunning ? 'green' : 'red';
+		node.innerHTML = '&ensp;%s%s&ensp;'.format(noGlobal ? instance + ' ' : '', isRunning ? _('Running') : _('Not Running'));
+	}
+
+	return node;
+}
+
 function handleGenKey(section_id, option) {
 	const type = this.section.getOption('type')?.formvalue(section_id);
 	const widget = L.bind(function(option) {
@@ -553,6 +571,8 @@ return baseclass.extend({
 	loadChoices,
 	loadChoicesGetMap,
 	// render
+	renderStatus,
+	updateStatus,
 	handleGenKey,
 	handleReload,
 	textvalue2Value,

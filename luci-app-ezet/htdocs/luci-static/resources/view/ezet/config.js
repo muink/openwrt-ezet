@@ -1,5 +1,6 @@
 'use strict';
 'require form';
+'require poll';
 'require rpc';
 'require uci';
 'require view';
@@ -176,6 +177,21 @@ return view.extend({
 
 		m = new form.Map('ezet', _('EasyTier') + ' ' + _('Configuration'),
 			_('A simple, decentralized mesh VPN with WireGuard support.'));
+
+		s = m.section(form.TypedSection);
+		s.render = function () {
+			poll.add(function() {
+				return ez.getServiceStatus('easytier-core').then((isRunning) => {
+					ez.updateStatus(document.getElementById('_core_bar'), isRunning, 'easytier-core', true);
+				});
+			});
+
+			return E('div', { class: 'cbi-section' }, [
+				E('p', [
+					ez.renderStatus('_core_bar', false, 'easytier-core', true)
+				])
+			]);
+		}
 
 		s = m.section(form.NamedSection, 'config', 'ezet');
 
