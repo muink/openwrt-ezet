@@ -87,7 +87,7 @@ const options = removeBlankAttrs({
 		"disable-registration": true,
 	} : {
 		"allow-auto-create-user": strToBool(getConsole('allow_auto_create_user')),
-		...(getConsole('oidc_issuer_url') ? {
+		...(strToBool(getConsole('oidc_enabled')) ? {
 			"oidc-issuer-url": getConsole('oidc_issuer_url'),
 			"oidc-client-id": getConsole('oidc_client_id'),
 			"oidc-client-secret": getConsole('oidc_client_secret'),

@@ -263,25 +263,31 @@ return view.extend({
 		 * https://docs.gitlab.com/integration/openid_connect_provider/
 		 * https://developers.google.com/identity/openid-connect/openid-connect
 		 */
+		o = s.taboption('field_authent', form.Flag, 'oidc_enabled', _('OIDC'));
+		o.default = o.disabled;
+		o.retain = true;
+		o.depends({disable_registration: '1', '!reverse': true});
+
 		o = s.taboption('field_authent', form.Value, 'oidc_issuer_url', _('OIDC issuer URL'),
 			_('OIDC issuer URL for single sign-on authentication.'));
 		o.placeholder = _('Obtain from OIDC issuer');
 		o.validate = ez.validateUrl;
 		o.retain = true;
-		o.depends({disable_registration: '1', '!reverse': true});
+		o.rmempty = false;
+		o.depends('oidc_enabled', '1');
 
 		o = s.taboption('field_authent', form.Value, 'oidc_client_id', _('OIDC client ID'));
 		o.placeholder = _('Obtain from OIDC issuer');
 		o.retain = true;
 		o.rmempty = false;
-		o.depends({oidc_issuer_url: /.+/});
+		o.depends('oidc_enabled', '1');
 
 		o = s.taboption('field_authent', form.Value, 'oidc_client_secret', _('OIDC client secret'));
 		o.placeholder = _('Obtain from OIDC issuer');
 		o.password = true;
 		o.retain = true;
 		o.rmempty = false;
-		o.depends({oidc_issuer_url: /.+/});
+		o.depends('oidc_enabled', '1');
 
 		o = s.taboption('field_authent', form.ListValue, 'oidc_username_claim', _('OIDC claim'),
 			_('Which OIDC claim used as the local username.'));
@@ -290,7 +296,7 @@ return view.extend({
 		o.value('preferred_username');
 		o.value('email');
 		o.retain = true;
-		o.depends({oidc_issuer_url: /.+/});
+		o.depends('oidc_enabled', '1');
 
 		o = s.taboption('field_authent', form.DynamicList, 'oidc_scopes', _('OIDC scopes'),
 			_('OIDC scopes to request during login.'));
@@ -301,12 +307,12 @@ return view.extend({
 		o.value('offline_access');
 		o.retain = true;
 		o.rmempty = false;
-		o.depends({oidc_issuer_url: /.+/});
+		o.depends('oidc_enabled', '1');
 
 		o = s.taboption('field_authent', form.Flag, 'oidc_disable_pkce', _('Disable OIDC PKCE'));
 		o.default = o.disabled;
 		o.retain = true;
-		o.depends({oidc_issuer_url: /.+/});
+		o.depends('oidc_enabled', '1');
 
 		o = s.taboption('field_authent', form.Value, 'oidc_redirect_url', _('OIDC callback URL'),
 			_('Must exactly match the callback URL registered with the identity provider.'));
@@ -322,7 +328,7 @@ return view.extend({
 
 			return ez.validateUrl.apply(this, arguments);
 		}
-		o.depends({oidc_issuer_url: /.+/});
+		o.depends('oidc_enabled', '1');
 
 		// Frontend
 		o = s.taboption('field_authent', form.Value, 'oidc_frontend_base_url', _('Web frontend base URL'),
@@ -341,9 +347,9 @@ return view.extend({
 
 			return ez.validateUrl.apply(this, arguments);
 		}
-		o.depends({oidc_issuer_url: /.+/, no_web: '1'});
-		o.depends({oidc_issuer_url: /.+/, web_server_addr: /.+/});
-		o.depends({oidc_issuer_url: /.+/, web_server_port: /.+/});
+		o.depends({oidc_enabled: '1', no_web: '1'});
+		o.depends({oidc_enabled: '1', web_server_addr: /.+/});
+		o.depends({oidc_enabled: '1', web_server_port: /.+/});
 
 		return m.render();
 	}
