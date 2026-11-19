@@ -56,8 +56,8 @@ add_firewall() {
 }
 
 add_web_firewall() {
-	local auto_firewall name proto ip port
-	config_get auto_firewall "$1" "auto_firewall"
+	local web_firewall name proto ip port
+	config_get web_firewall "config" "web_firewall"
 
 	local config_server_protocol config_server_port
 	config_get config_server_protocol "$1" "config_server_protocol" "udp"
@@ -68,7 +68,7 @@ add_web_firewall() {
 	local web_server_addr web_server_port
 	config_get web_server_addr "$1" "web_server_addr"
 	config_get web_server_port "$1" "web_server_port"
-	for _ in $auto_firewall; do
+	for _ in $web_firewall; do
 		case "$_" in
 			config_server)
 				name="${1}-config-server"

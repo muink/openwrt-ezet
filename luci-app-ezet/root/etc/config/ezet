@@ -14,6 +14,7 @@ config web 'console'
 	option config_server_protocol 'udp'
 	option config_server_port '22020'
 	option api_server_port '11211'
+	option api_host 'http://192.168.1.1:11211'
 
 config instance 'instance_easytiernode'
 	option label 'easytiernode'

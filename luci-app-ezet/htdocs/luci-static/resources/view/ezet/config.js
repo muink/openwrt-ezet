@@ -202,6 +202,13 @@ return view.extend({
 		o = s.taboption('general', form.SectionValue, '_global', form.NamedSection, 'global', 'core', _('Global settings'));
 		ss = o.subsection;
 
+		/* Client switch */
+		so = ss.option(form.Button, '_reload_core', _('Quick Reload'));
+		so.ucisection = 'config';
+		so.inputtitle = _('Reload');
+		so.inputstyle = 'apply';
+		so.onclick = L.bind(ez.handleReload, so, 'easytier-core');
+
 		so = ss.option(form.Flag, 'core_enabled', _('Enable'));
 		so.ucisection = 'config';
 		so.default = so.disabled;
@@ -214,16 +221,8 @@ return view.extend({
 
 		so = ss.option(form.Value, 'config_server', _('Config server'),
 			_('Retrieve configuration distributed by the config-server.'));
-		so.placeholder = 'udp://127.0.0.1:22020/admin';
-		so.validate = function(section_id, value) {
-			const widget = this.getUIElement(section_id).node.querySelector('input');
-			const config_server_protocol = uci.get(data[0], 'console', 'config_server_protocol')
-			const config_server_port = uci.get(data[0], 'console', 'config_server_port')
-
-			widget.placeholder = `${config_server_protocol}://localhost:${config_server_port}/admin`;
-
-			return ez.validateUrl.apply(this, arguments);
-		}
+		so.placeholder = 'udp://example.lan:22020/admin';
+		so.validate = ez.validateUrl;
 
 		so = ss.option(form.Value, 'machine_id', _('Machine ID'));
 		so.placeholder = hostInfo.machine_id;

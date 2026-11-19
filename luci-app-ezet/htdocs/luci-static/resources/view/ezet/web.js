@@ -45,7 +45,13 @@ return view.extend({
 		s.tab('field_webserv', _('Web server'));
 		s.tab('field_authent', _('Authentication'));
 
-		/* General fields */
+		/* Server switch */
+		o = s.taboption('field_general', form.Button, '_reload_web', _('Quick Reload'));
+		o.ucisection = 'config';
+		o.inputtitle = _('Reload');
+		o.inputstyle = 'apply';
+		o.onclick = L.bind(ez.handleReload, o, 'easytier-web');
+
 		o = s.taboption('field_general', form.Flag, 'web_enabled', _('Enable'));
 		o.ucisection = 'config';
 		o.default = o.disabled;
@@ -58,9 +64,10 @@ return view.extend({
 				.then(L.bind(o.map.reset, o.map));
 		}
 
-		o = s.taboption('field_general', form.MultiValue, 'auto_firewall', _('Firewall'),
+		o = s.taboption('field_general', form.MultiValue, 'web_firewall', _('Firewall'),
 			_('Auto configure firewall') + '</br>' +
 			_('For HTTP, recommended to use a reverse proxy.'));
+		o.ucisection = 'config';
 		o.value('config_server', _('Config server'));
 		o.value('api_server', _('API server'));
 		if (features.embed_frontend)
@@ -73,6 +80,7 @@ return view.extend({
 				.then(L.bind(o.map.reset, o.map));
 		}
 
+		/* General fields */
 		o = s.taboption('field_general', form.ListValue, 'console_log_level', _('Console log level'));
 		o.default = 'warn';
 		ez.log_levels.forEach((res) => {

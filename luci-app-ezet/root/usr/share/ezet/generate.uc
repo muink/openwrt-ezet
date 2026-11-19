@@ -23,8 +23,7 @@ uci.load(uciconf);
 
 const uciezet = 'config';
 
-const uciglobal = 'global',
-      uciconsole = 'console';
+const uciglobal = 'global';
 
 const uciinst = 'instance',
       ucipeer = 'peer',
@@ -32,11 +31,7 @@ const uciinst = 'instance',
       ucistun = 'stun_server';
 
 /* Global options */
-const web_enabled = strToBool(uci.get(uciconf, uciezet, 'web_enabled')),
-      config_server_protocol = uci.get(uciconf, uciconsole, 'config_server_protocol') || 'udp',
-      config_server_port = strToInt(uci.get(uciconf, uciconsole, 'config_server_port')) || 22020;
-
-const config_server = uci.get(uciconf, uciglobal, 'config_server') || `${config_server_protocol}://localhost:${config_server_port}/admin`,
+const config_server = uci.get(uciconf, uciglobal, 'config_server'),
       machine_id = uci.get(uciconf, uciglobal, 'machine_id') || ubus.call('luci.ezet', 'get_host_info')?.machine_id,
       hostname = uci.get(uciconf, uciglobal, 'hostname') || ubus.call('luci.ezet', 'get_host_info')?.hostname,
       console_log_level = uci.get(uciconf, uciglobal, 'console_log_level') || 'warn',
@@ -83,7 +78,7 @@ function get_listeners(cfg) {
 /* Main */
 const options = removeBlankAttrs({
 	/* Config settings */
-	"config-server": web_enabled ? config_server : null,
+	"config-server": config_server,
 	"machine-id": machine_id,
 	"state-dir": EZ_DIR,
 	// "config-file": ,
