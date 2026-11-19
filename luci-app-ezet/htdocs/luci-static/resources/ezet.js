@@ -428,7 +428,7 @@ function renderStatus(elemId, isRunning, instance, noGlobal) {
 		updateStatus(E('span', { id: elemId, style: 'border: unset; font-style: italic; font-weight: bold' }), isRunning ? true : false),
 		E('a', {
 			class: 'cbi-button cbi-button-apply %s'.format(visible ? '' : 'hidden'),
-			href: isRunning.url,
+			href: visible ? isRunning.url : '',
 			target: '_blank',
 			rel: 'noreferrer noopener'
 		}, [ _('Open Dashboard') ])
@@ -446,7 +446,7 @@ function updateStatus(node, isRunning, instance, noGlobal) {
 			else
 				node.nextSibling.classList.add('hidden');
 
-			node.nextSibling.href = isRunning.url;
+			node.nextSibling.href = visible ? isRunning.url : '';
 		}
 	}
 

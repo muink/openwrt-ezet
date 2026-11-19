@@ -148,11 +148,13 @@ start_service() {
 			return 1
 		fi
 
-		config_files=$(echo " $config_files" | sed 's| | -c |g')
-		if ! eval "\"$BINCORE\" $core_opti --check-config $config_files" 2>/dev/null; then
-			log "Error: wrong core configuration detected."
-			eval "\"$BINCORE\" $core_opti --check-config $config_files" 2>>"$LOG_PATH"
-			return 1
+		if [ -n "$config_files" ]; then
+			config_files=$(echo " $config_files" | sed 's| | -c |g')
+			if ! eval "\"$BINCORE\" $core_opti --check-config $config_files" 2>/dev/null; then
+				log "Error: wrong core configuration detected."
+				eval "\"$BINCORE\" $core_opti --check-config $config_files" 2>>"$LOG_PATH"
+				return 1
+			fi
 		fi
 		echo > "$RUN_DIR/easytier-core.log"
 
@@ -172,6 +174,7 @@ start_service() {
 		# configure firewall
 		json_add_array firewall
 			# meta l4proto %s th dport %s counter accept comment "!%s: accept server instance [%s]"
+			if [ -n "$config_files" ]; then
 			config_foreach add_firewall "listener" "$(yq -ptoml eval-all '
 				[
 					select((.listeners // []) | length > 0)
@@ -180,6 +183,7 @@ start_service() {
 				| map( tostring | @sh )
 				| join(" ")
 			' ${config_files//-c/} 2>/dev/null)"
+			fi
 		json_close_array
 		procd_close_data
 
