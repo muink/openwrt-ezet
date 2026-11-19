@@ -311,11 +311,19 @@ return view.extend({
 
 		so = ss.taboption('field_Base', ez.GenValue, 'network_secret', _('Room secret'));
 		so.password = true;
-		so.editable = true;
+		so.modalonly = true;
+		so.depends({credential: ''});
+
+		so = ss.taboption('field_Base', form.Value, 'credential', _('Temporary credential'),
+			_('Base64 encoded X25519 private key.'));
+		so.password = true;
+		so.validate = L.bind(ez.validateBase64Key, so, 44);
+		so.modalonly = true;
 
 		so = ss.taboption('field_Base', form.Flag, 'private_mode', _('Private room'),
 			_('Only nodes using the same %s and %s as this network are permitted to perform a handshake or relay traffic through this node.')
-			.format(_('Room name'), _('Room secret')));
+			.format(_('Room name'), _('Room secret')) + '</br>' +
+			_('Or foreign credential node is already trusted via admin-issued credential propagation.'));
 		so.default = so.disabled;
 		so.editable = true;
 
@@ -323,12 +331,13 @@ return view.extend({
 		so.default = so.disabled;
 		so.validate = function(section_id, value) {
 			const secure_mode = this.getUIElement(section_id).node.querySelector('input');
+			const credential = this.section.getOption('credential').formvalue(section_id);
 			const peers = this.section.getOption('peers').formvalue(section_id);
 			const peers_public_key = peers.filter(Boolean)
 				.map(sid => uci.get(this.config, sid, 'peer_public_key')).filter(Boolean);
 
 			// Force enabled
-			if (peers_public_key.length > 0) {
+			if (credential || peers_public_key.length > 0) {
 				secure_mode.checked = true;
 				secure_mode.disabled = true;
 			} else
@@ -460,13 +469,13 @@ return view.extend({
 		so.validate = L.bind(ez.validateBase64Key, so, 44);
 		so.rmempty = false;
 		so.retain = true;
-		so.depends('secure_mode', '1');
+		so.depends({secure_mode: '1', credential: ''});
 		so.modalonly = true;
 
 		so = ss.taboption('field_secure', ez.CopyValue, 'local_public_key', _('Client public key'),
 			_('Base64 encoded X25519 public key.'));
 		so.retain = true;
-		so.depends('secure_mode', '1');
+		so.depends({secure_mode: '1', credential: ''});
 		so.modalonly = true;
 
 		/** Server fields **/

@@ -146,7 +146,7 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		/* Network settings */
 		network_identity: {
 			network_name: cfg.network_name,
-			network_secret: cfg.network_secret,
+			network_secret: cfg.credential ? null : cfg.network_secret,
 		},
 		ipv4: cfg.ipv4,
 		ipv6: cfg.ipv6,
@@ -173,11 +173,10 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		ipv6_public_addr_prefix: cfg.ipv6_public_addr_prefix, // || auto_ipv6_gua_prefix,
 
 		/* Secure mode settings */
-		secure_mode: strToBool(cfg.secure_mode) ? {
+		secure_mode: (strToBool(cfg.secure_mode) || cfg.credential) ? {
 			enabled: true,
-			local_private_key: cfg.local_private_key,
-			local_public_key: cfg.local_public_key,
-			//// credential: ,
+			local_private_key: cfg.credential || cfg.local_private_key,
+			local_public_key: cfg.credential ? null : cfg.local_public_key,
 			//// credential_file: ,
 		} : null,
 
