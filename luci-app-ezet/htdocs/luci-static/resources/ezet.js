@@ -273,6 +273,17 @@ function generateRand(type, length) {
 	};
 }
 
+function isEmpty(res) {
+	if (res == null) return true;                                                // null, undefined
+	if (typeof res.length === 'number') return res.length === 0;                 // empty String/Array/TypedArray
+	if (res instanceof ArrayBuffer) return res.byteLength === 0;                 // empty ArrayBuffer
+	if (typeof res === 'object') {
+		if (res instanceof Map || res instanceof Set) return res.size === 0;     // empty Map/Set
+		return Object.keys(res).length === 0;                                    // empty Object
+	}
+	return false;
+}
+
 function getFeatures() {
 	const callGetFeatures = rpc.declare({
 		object: 'luci.ezet',
@@ -561,6 +572,7 @@ return baseclass.extend({
 
 	/* Method */
 	generateRand,
+	isEmpty,
 	getFeatures,
 	getServiceStatus,
 	ipv6CidrToRange,
