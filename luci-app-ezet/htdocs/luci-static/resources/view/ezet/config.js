@@ -226,6 +226,7 @@ return view.extend({
 
 		so = ss.option(form.Value, 'machine_id', _('Machine ID'));
 		so.placeholder = hostInfo.machine_id;
+		so.default = hostInfo.machine_id;
 		so.validate = ez.validateUUID;
 
 		so = ss.option(form.Value, 'hostname', _('Hostname'));
