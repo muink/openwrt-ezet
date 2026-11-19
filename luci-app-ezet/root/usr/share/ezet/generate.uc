@@ -83,7 +83,7 @@ const options = removeBlankAttrs({
 	"state-dir": EZ_DIR,
 	// "config-file": ,
 	"config-dir": `${EZ_DIR}/config`,
-	//// "shared-runtime": ,
+	"shared-runtime": true, // and disable multi_thread & multi_thread_count
 	//// "check-config": ,
 	//// "daemon": ,
 	//// "generate-completions": ,
