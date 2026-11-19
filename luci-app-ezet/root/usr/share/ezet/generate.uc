@@ -60,6 +60,30 @@ function get_peers(cfg) {
 		die(sprintf("unsupported type %s of peers %J.", cfg_type, cfg));
 }
 
+
+function get_proxy_networks(cfg) {
+	if (isEmpty(cfg))
+		return null;
+
+	const cfg_type = type(cfg);
+	if (cfg_type === 'string') {
+		const parts = split(cfg, '->');
+
+		return {
+			// Real LAN subnet advertised by this node.
+			cidr: parts[0],
+			// Optional. remap when the real LAN subnet overlaps another network.
+			mapped_cidr: parts[1],
+			// Optional. allow-list; leave omitted unless you need to constrain access.
+			// allow: ["10.126.126.0/24"] // Not currently in use.
+		};
+	} else if (cfg_type === 'array')
+		return filter(map(cfg, c => get_proxy_networks(c)), v => !isEmpty(v));
+	else
+		die(sprintf("unsupported type %s of proxy_networks %J.", cfg_type, cfg));
+}
+
+
 function get_listeners(cfg) {
 	if (isEmpty(cfg))
 		return null;
@@ -159,7 +183,9 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 
 		/* Peers settings */
 		peer: filter(get_peers(cfg.peers) || [], v => !isEmpty(v)),
-		//// proxy_network: cfg.proxy_networks,
+
+		/* Proxy networks settings */
+		proxy_network: filter(get_proxy_networks(cfg.proxy_networks) || [], v => !isEmpty(v)),
 
 		/* Listener settings */
 		...(strToBool(cfg.no_listener) ? {

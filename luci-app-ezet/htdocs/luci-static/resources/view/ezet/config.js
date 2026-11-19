@@ -1,9 +1,11 @@
 'use strict';
 'require form';
+'require network';
 'require poll';
 'require rpc';
 'require uci';
 'require view';
+'require validation';
 
 'require ezet as ez';
 
@@ -160,18 +162,64 @@ function renderURIs(s, uciconfig, isServer = false) {
 	}
 }
 
+function getNetworkCIDR4(cidr) {
+	const [addr, prefix] = cidr.split('/');
+	const octets = validation.parseIPv4(addr);
+
+	if (!octets || prefix == null)
+		return null;
+
+	const bits = +prefix;
+
+	if (!Number.isInteger(bits) || bits < 0 || bits > 32)
+		return null;
+
+	const network = octets.map((octet, i) => {
+		const n = Math.max(0, Math.min(8, bits - i * 8));
+		const mask = n ? (0xff << (8 - n)) & 0xff : 0;
+
+		return octet & mask;
+	});
+
+	return `${network.join('.')}/${bits}`;
+}
+
+function getLocalSubnets() {
+	return network.getNetworks().then(networks => {
+		const subnets = new Map();
+
+		for (let net of networks) {
+			for (let addr of net.getIPAddrs()) {
+				const cidr = getNetworkCIDR4(addr);
+
+				if (cidr && !subnets.has(cidr)) {
+					subnets.set(cidr, {
+						cidr,
+						interface: net.getName(),
+						device: net.getIfname()
+					});
+				}
+			}
+		}
+
+		return Array.from(subnets.values());
+	});
+}
+
 return view.extend({
 	load() {
 		return Promise.all([
 			uci.load('ezet'),
 			callGetHostInfo(),
+			getLocalSubnets(),
 			callGetV6GUAPrefix(),
 		]);
 	},
 
 	render(data) {
 		const hostInfo = data[1];
-		const ip6guaPrefix = data[2];
+		const localSubnets = data[2];
+		const ip6guaPrefix = data[3];
 
 		let m, s, o, ss, so;
 
@@ -352,6 +400,48 @@ return view.extend({
 			], section_id);
 		}
 		so.rmempty = false;
+		so.modalonly = true;
+
+		so = ss.taboption('field_Base', form.MultiValue, 'proxy_networks', _('Subnet proxy'),
+			_('List of local subnets (CIDR) to be open to other peers.') + '</br>' +
+			_('Or mapping the local subnet to a non-overlapping IPv4 subnet in the EasyTier network.') + '</br>' +
+			_('Other peers can access the local devices through the mapped addresses.'));
+		so.create = true;
+		so.custom_placeholder = '192.168.1.0/24[->198.18.1.0/24]';
+		so.placeholder = '192.168.1.0/24[->198.18.1.0/24]';
+		so.value('', _('-- Please choose --'));
+		so.load = function(section_id) {
+			return ez.loadChoices.call(this, [
+				['', _('-- Please choose --')],
+				...localSubnets.filter(e => e.device !== 'lo')
+					.map(e => [e.cidr, E([], [ e.cidr, ' (', E('strong', {}, [e.interface]), ')' ]) ])
+			], section_id);
+		}
+		so.validate = function(section_id, value) {
+			const values = value.split(' ');
+
+			for (value of values) {
+				if (ez.isEmpty(value))
+					return true;
+
+				const parts = value.split('->');
+
+				if (parts.length > 2)
+					return _('Expecting: %s').format(_('IPv4 CIDR or IPv4 CIDR mapping (real->mapped).'));
+				else if (parts.length === 2) {
+					if (!ez.stubValidator.apply('cidr4', parts[1]))
+						return _('Expecting: %s').format(_('Valid mapped IPv4 CIDR.'));
+
+					const prefix = cidr => cidr.split('/')[1];
+
+					if (prefix(parts[0]) !== prefix(parts[1]))
+						return _('Expecting: %s').format(_('Mapped CIDR must have the same prefix length as the original CIDR.'));
+				} else if (!ez.stubValidator.apply('cidr4', parts[0]))
+					return _('Expecting: %s').format(_('Valid real IPv4 CIDR.'));
+			}
+
+			return true;
+		};
 		so.modalonly = true;
 
 		/** Secure fields **/
