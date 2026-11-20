@@ -339,7 +339,7 @@ const methods = {
 		args: { configs: 'configs', invert: 'invert' },
 		call: function(req) {
 			const configs = json(trim(req.args?.configs || '[]'));
-			const invert = (req.args?.invert || false) === 'true';
+			const invert = (req.args?.invert || '0') == 1;
 
 			if (type(configs) !== 'array')
 				return { result: false, error: 'illegal configs type' };

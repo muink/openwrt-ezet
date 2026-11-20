@@ -266,7 +266,7 @@ stop_core() {
 		done
 		ubus call luci.ezet write_configs '{"configs":
 			"'"$(json_dump | jsonfilter -qe '@.arr' | sed 's|"|\\\"|g')"'",
-			"invert":"true"}' >/dev/null # rm $@.toml
+			"invert":"1"}' >/dev/null # rm $@.toml
 	else
 		ubus call luci.ezet write_configs '{"configs":""}' >/dev/null # rm *.toml
 	fi
