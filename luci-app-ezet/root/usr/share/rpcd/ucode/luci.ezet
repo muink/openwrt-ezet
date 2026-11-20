@@ -4,13 +4,13 @@
 
 const less_26 = true;
 
-import { access, basename, glob, lstat, mkdir, popen, readfile, writefile } from 'fs';
+import { access, basename, dirname, glob, lsdir, lstat, mkdir, popen, readfile, writefile } from 'fs';
 import * as digest from 'digest';
 //import * as netaddr from 'netaddr'; // @less_26_??
 import {
 	shellQuote, isEmpty, yqRead, yqReadFile,
 	IPv6CIDR, // @less_26_??
-	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR
+	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR, RES_TYPE
 } from 'ezet';
 
 function hasKernelModule(kmod) {
@@ -387,6 +387,80 @@ const methods = {
 			const filestat = lstat(`${RUN_DIR}/${req.args?.type}.log`);
 			if (filestat)
 				writefile(`${RUN_DIR}/${req.args?.type}.log`, '');
+			return { result: true };
+		}
+	},
+
+	dir_ls: {
+		args: { type: 'type' },
+		call: function(req) {
+			if (!(req.args?.type in RES_TYPE))
+				return { result: null, error: 'illegal type' };
+
+			const list = lsdir(`${EZ_DIR}/${req.args?.type}/`);
+			return { result: list };
+		}
+	},
+
+	file_read: {
+		args: { type: 'type', filename: 'filename', isbinary: 'isbinary' },
+		call: function(req) {
+			if (!(req.args?.type in RES_TYPE))
+				return { content: null, error: 'illegal type' };
+
+			if ((!req.args?.filename) || match(req.args?.filename, /\.\.\//))
+				return { content: null, error: 'illegal filename' };
+
+			let filecontent = readfile(`${EZ_DIR}/${req.args?.type}/${req.args?.filename}`);
+
+			if (req.args?.isbinary == 1)
+				filecontent = b64enc(filecontent);
+
+			return { content: filecontent };
+		}
+	},
+
+	file_write: {
+		args: { type: 'type', filename: 'filename', content: 'content', isbinary: 'isbinary' },
+		call: function(req) {
+			if (!(req.args?.type in RES_TYPE))
+				return { result: false, error: 'illegal type' };
+
+			if ((!req.args?.filename) || match(req.args?.filename, /\.\.\//))
+				return { result: false, error: 'illegal filename' };
+
+			const file = `${EZ_DIR}/${req.args?.type}/${req.args?.filename}`;
+			let content = req.args?.content;
+
+			/* Sanitize content */
+			if (content) {
+				content = trim(content);
+				content = replace(content, /\r\n?/g, '\n');
+				if (!match(content, /\n$/))
+					content += '\n';
+			}
+
+			if (req.args?.isbinary == 1)
+				content = b64dec(content);
+
+			system(`mkdir -p ${dirname(file)}`);
+			writefile(file, content);
+
+			return { result: true };
+		}
+	},
+
+	file_remove: {
+		args: { type: 'type', filename: 'filename' },
+		call: function(req) {
+			if (!(req.args?.type in RES_TYPE))
+				return { result: false, error: 'illegal type' };
+
+			if ((!req.args?.filename) || match(req.args?.filename, /\.\.\//))
+				return { result: false, error: 'illegal filename' };
+
+			system(`rm -rf ${EZ_DIR}/${req.args?.type}/${shellQuote(req.args?.filename)}`);
+
 			return { result: true };
 		}
 	}

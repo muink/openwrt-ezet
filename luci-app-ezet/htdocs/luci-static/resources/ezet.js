@@ -596,6 +596,70 @@ function validateUniqueValue(section_id, value) {
 	return true;
 }
 
+function lsDir(type) {
+	const callLsDir = rpc.declare({
+		object: 'luci.ezet',
+		method: 'dir_ls',
+		params: ['type'],
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callLsDir(type), {}).then((res) => {
+		if (res.result) {
+			return res.result;
+		} else
+			throw res.error || 'unknown error';
+	});
+}
+
+function readFile(type, filename, isbinary) {
+	const callReadFile = rpc.declare({
+		object: 'luci.ezet',
+		method: 'file_read',
+		params: ['type', 'filename', 'isbinary'],
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callReadFile(type, filename, isbinary), {}).then((res) => {
+		if (res.content ?? true) {
+			return res.content;
+		} else
+			throw res.error || 'unknown error';
+	});
+}
+
+function writeFile(type, filename, content, isbinary) {
+	const callWriteFile = rpc.declare({
+		object: 'luci.ezet',
+		method: 'file_write',
+		params: ['type', 'filename', 'content', 'isbinary'],
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callWriteFile(type, filename, content, isbinary), {}).then((res) => {
+		if (res.result) {
+			return res.result;
+		} else
+			throw res.error || 'unknown error';
+	});
+}
+
+function removeFile(type, filename) {
+	const callRemoveFile = rpc.declare({
+		object: 'luci.ezet',
+		method: 'file_remove',
+		params: ['type', 'filename'],
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callRemoveFile(type, filename), {}).then((res) => {
+		if (res.result) {
+			return res.result;
+		} else
+			throw res.error || 'unknown error';
+	});
+}
+
 return baseclass.extend({
 	/* Member */
 	EZ_DIR,
@@ -639,4 +703,9 @@ return baseclass.extend({
 	validateIPv4Privnet,  // this
 	validateIPv6Guanet,  // this
 	validateUniqueValue,  // this
+	// file operations
+	lsDir,
+	readFile,
+	writeFile,
+	removeFile,
 });

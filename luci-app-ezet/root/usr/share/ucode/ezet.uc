@@ -551,6 +551,35 @@ export function strToInt(str) {
 	return !match(str, /^\d+$/) ? str : int(str) ?? null;
 };
 
+export function durationToSecond(str) {
+	if (isEmpty(str))
+		return null;
+
+	let seconds = 0;
+	let arr = match(str, /^(\d+)(s|m|h|d)?$/);
+	if (arr) {
+		switch (arr[2]) {
+			case 's':
+				seconds = strToInt(arr[1]);
+				break;
+			case 'm':
+				seconds = strToInt(arr[1]) * 60;
+				break;
+			case 'h':
+				seconds = strToInt(arr[1]) * 3600;
+				break;
+			case 'd':
+				seconds = strToInt(arr[1]) * 86400;
+				break;
+			default:
+				seconds = strToInt(arr[1]);
+				break;
+		}
+	}
+
+	return seconds;
+};
+
 export function arrToObj(res) {
 	if (isEmpty(res))
 		return null;
