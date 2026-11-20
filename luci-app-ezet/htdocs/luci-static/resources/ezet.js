@@ -629,6 +629,16 @@ function textvalue2Value(section_id) {
 	return this.vallist[i] ?? cval;
 }
 
+function validateTimeDuration(section_id, value) {
+	if (!value)
+		return true;
+
+	if (!value.match(/^(\d+)(s|m|h|d)?$/))
+		return _('Expecting: %s').format('^(\\d+)(s|m|h|d)?$');
+
+	return true;
+}
+
 function validateUUID(section_id, value) {
 	if (!value)
 		return true;
@@ -813,6 +823,7 @@ return baseclass.extend({
 	handleRemoveIdles,
 	textvalue2Value,  // this
 	// validate
+	validateTimeDuration,
 	validateUUID,
 	validateUrl,
 	validateBase64Key,  // this
