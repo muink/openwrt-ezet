@@ -173,12 +173,14 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		ipv6_public_addr_prefix: cfg.ipv6_public_addr_prefix, // || auto_ipv6_gua_prefix,
 
 		/* Secure mode settings */
-		secure_mode: (strToBool(cfg.secure_mode) || cfg.credential) ? {
-			enabled: true,
-			local_private_key: cfg.credential || cfg.local_private_key,
-			local_public_key: cfg.credential ? null : cfg.local_public_key,
-			//// credential_file: ,
-		} : null,
+		...((cfg.credential || strToBool(cfg.secure_mode)) ? {
+			credential_file: cfg.credential ? null : `${EZ_DIR}/${uciinst}/${cfg['.name']}/credentials.json`,
+			secure_mode: {
+				enabled: true,
+				local_private_key: cfg.credential || cfg.local_private_key,
+				local_public_key: cfg.credential ? null : cfg.local_public_key,
+			}
+		} : {}),
 
 		/* Peers settings */
 		peer: filter(get_peers(cfg.peers) || [], v => !isEmpty(v)),

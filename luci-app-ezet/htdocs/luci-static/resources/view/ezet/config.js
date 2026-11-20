@@ -329,6 +329,10 @@ return view.extend({
 
 		so = ss.taboption('field_Base', form.Flag, 'secure_mode', _('🔒Secure mode'));
 		so.default = so.disabled;
+		so.write = function(section_id, formvalue) {
+			this.super('write', ...arguments);
+			return ez.writeFile.call(this, this.section.sectiontype, section_id + '/credentials.json', '{}');
+		}
 		so.validate = function(section_id, value) {
 			const secure_mode = this.getUIElement(section_id).node.querySelector('input');
 			const credential = this.section.getOption('credential').formvalue(section_id);
