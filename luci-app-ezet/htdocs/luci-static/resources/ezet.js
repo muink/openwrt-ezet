@@ -210,27 +210,29 @@ const CBICopyValue = form.Value.extend({
 	renderWidget(section_id, option_index, cfgvalue) {
 		let node = form.Value.prototype.renderWidget.apply(this, arguments);
 
-		node.classList.add('control-group');
+		if (!this.password)
+			node.classList.add('control-group');
 
-		if (this.section.section) // modalonly
-			node.appendChild(E('button', {
-				class: 'cbi-button cbi-button-add',
-				click: ui.createHandlerFn(this, async (section_id) => {
-					try {
-						await navigator.clipboard.writeText(this.formvalue(section_id));
-						console.log('Content copied to clipboard!');
-					} catch (e) {
-						console.error('Failed to copy: ', e);
-					}
-					/* Deprecated
-					let inputEl = document.getElementById(this.cbid(section_id)).querySelector('input');
-					inputEl.select();
-					document.execCommand("copy");
-					inputEl.blur();
-					*/
-					return alert(_('Content copied to clipboard!'));
-				}, section_id)
-			}, [ _('Copy') ]));
+		(node.querySelector('.control-group') || node).lastChild.style.padding = '0 7px';
+		(node.querySelector('.control-group') || node).appendChild(E('button', {
+			class: 'cbi-button cbi-button-add',
+			style: "margin-left: calc(-.2em + -2px); border-radius: 0 3px 3px 0; padding: 0 4px;",
+			click: ui.createHandlerFn(this, async (section_id) => {
+				try {
+					await navigator.clipboard.writeText(this.formvalue(section_id));
+					console.log('Content copied to clipboard!');
+				} catch (e) {
+					console.error('Failed to copy: ', e);
+				}
+				/* Deprecated
+				let inputEl = document.getElementById(this.cbid(section_id)).querySelector('input');
+				inputEl.select();
+				document.execCommand("copy");
+				inputEl.blur();
+				*/
+				return alert(_('Content copied to clipboard!'));
+			}, section_id)
+		}, [ _('📋') ]));
 
 		return node;
 	}
