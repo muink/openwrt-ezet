@@ -1,11 +1,9 @@
 'use strict';
 'require form';
-'require network';
 'require poll';
 'require rpc';
 'require uci';
 'require view';
-'require validation';
 
 'require ezet as ez';
 
@@ -162,56 +160,12 @@ function renderURIs(s, uciconfig, isServer = false) {
 	}
 }
 
-function getNetworkCIDR4(cidr) {
-	const [addr, prefix] = cidr.split('/');
-	const octets = validation.parseIPv4(addr);
-
-	if (!octets || prefix == null)
-		return null;
-
-	const bits = +prefix;
-
-	if (!Number.isInteger(bits) || bits < 0 || bits > 32)
-		return null;
-
-	const network = octets.map((octet, i) => {
-		const n = Math.max(0, Math.min(8, bits - i * 8));
-		const mask = n ? (0xff << (8 - n)) & 0xff : 0;
-
-		return octet & mask;
-	});
-
-	return `${network.join('.')}/${bits}`;
-}
-
-function getLocalSubnets() {
-	return network.getNetworks().then(networks => {
-		const subnets = new Map();
-
-		for (let net of networks) {
-			for (let addr of net.getIPAddrs()) {
-				const cidr = getNetworkCIDR4(addr);
-
-				if (cidr && !subnets.has(cidr)) {
-					subnets.set(cidr, {
-						cidr,
-						interface: net.getName(),
-						device: net.getIfname()
-					});
-				}
-			}
-		}
-
-		return Array.from(subnets.values());
-	});
-}
-
 return view.extend({
 	load() {
 		return Promise.all([
 			uci.load('ezet'),
 			callGetHostInfo(),
-			getLocalSubnets(),
+			ez.getLocalSubnets(),
 			callGetV6GUAPrefix(),
 		]);
 	},
@@ -460,6 +414,7 @@ return view.extend({
 		/** Secure fields **/
 		so = ss.taboption('field_secure', ez.GenValue, 'local_private_key', _('Client private key'),
 			_('Base64 encoded X25519 private key.'));
+		so.password = true;
 		so.ez_options = {
 			type: 'wg-keypair',
 			callback: function(result) {
@@ -469,7 +424,6 @@ return view.extend({
 				]
 			}
 		}
-		so.password = true;
 		so.validate = L.bind(ez.validateBase64Key, so, 44);
 		so.rmempty = false;
 		so.retain = true;

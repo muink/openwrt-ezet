@@ -26,9 +26,17 @@
 			"path": "ezet/config"
 		}
 	},
+	"admin/vpn/ezet/credentials": {
+		"title": "Credentials",
+		"order": 40,
+		"action": {
+			"type": "view",
+			"path": "ezet/credentials"
+		}
+	},
 	"admin/vpn/ezet/web": {
 		"title": "Web",
-		"order": 40,
+		"order": 60,
 		"action": {
 			"type": "view",
 			"path": "ezet/web"
@@ -36,7 +44,7 @@
 	},
 	"admin/vpn/ezet/log": {
 		"title": "Log",
-		"order": 60,
+		"order": 90,
 		"action": {
 			"type": "view",
 			"path": "ezet/log"

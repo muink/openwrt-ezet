@@ -2,6 +2,7 @@
 'require baseclass';
 'require form';
 'require fs';
+'require network';
 'require rpc';
 'require uci';
 'require ui';
@@ -340,6 +341,50 @@ function getDashURL(instance) {
 	});
 }
 
+function getNetworkCIDR4(cidr) {
+	const [addr, prefix] = cidr.split('/');
+	const octets = validation.parseIPv4(addr);
+
+	if (!octets || prefix == null)
+		return null;
+
+	const bits = +prefix;
+
+	if (!Number.isInteger(bits) || bits < 0 || bits > 32)
+		return null;
+
+	const network = octets.map((octet, i) => {
+		const n = Math.max(0, Math.min(8, bits - i * 8));
+		const mask = n ? (0xff << (8 - n)) & 0xff : 0;
+
+		return octet & mask;
+	});
+
+	return `${network.join('.')}/${bits}`;
+}
+
+function getLocalSubnets() {
+	return network.getNetworks().then(networks => {
+		const subnets = new Map();
+
+		for (let net of networks) {
+			for (let addr of net.getIPAddrs()) {
+				const cidr = getNetworkCIDR4(addr);
+
+				if (cidr && !subnets.has(cidr)) {
+					subnets.set(cidr, {
+						cidr,
+						interface: net.getName(),
+						device: net.getIfname()
+					});
+				}
+			}
+		}
+
+		return Array.from(subnets.values());
+	});
+}
+
 function ipv6CidrToRange(cidr) {
 	const [addr, prefix] = cidr.split('/');
 	const words = validation.parseIPv6(addr);
@@ -518,6 +563,16 @@ function textvalue2Value(section_id) {
 	return this.vallist[i] ?? cval;
 }
 
+function validateTimeDuration(section_id, value) {
+	if (!value)
+		return true;
+
+	if (!value.match(/^(\d+)(s|m|h|d)?$/))
+		return _('Expecting: %s').format('^(\\d+)(s|m|h|d)?$');
+
+	return true;
+}
+
 function validateUUID(section_id, value) {
 	if (!value)
 		return true;
@@ -685,6 +740,8 @@ return baseclass.extend({
 	getFeatures,
 	getServiceStatus,
 	getDashURL,
+	getNetworkCIDR4,
+	getLocalSubnets,
 	ipv6CidrToRange,
 	ipv6RangeContains,
 	// load
@@ -699,6 +756,7 @@ return baseclass.extend({
 	handleReload,
 	textvalue2Value,
 	// validate
+	validateTimeDuration,
 	validateUUID,
 	validateUrl,
 	validateBase64Key,  // this
