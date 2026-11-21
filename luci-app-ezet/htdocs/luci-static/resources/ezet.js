@@ -556,6 +556,50 @@ function handleReload(instance, ev, section_id) {
 		})
 }
 
+function handleRemoveIdles() {
+	const section_type = this.sectiontype;
+
+	let loaded = [];
+	uci.sections(this.config, section_type, (section, sid) => loaded.push(sid));
+
+	return lsDir(section_type).then((res) => {
+		let sectionEl = E('div', { class: 'cbi-section' }, []);
+
+		res.filter(e => !loaded.includes(e)).forEach((filename) => {
+			sectionEl.appendChild(E('div', { class: 'cbi-value' }, [
+				E('label', {
+					class: 'cbi-value-title',
+					id: 'rmidles.' + filename + '.label'
+				}, [ filename ]),
+				E('div', { class: 'cbi-value-field' }, [
+					E('button', {
+						class: 'cbi-button cbi-button-negative important',
+						id: 'rmidles.' + filename + '.button',
+						click: ui.createHandlerFn(this, (filename) => {
+							return removeFile(section_type, filename).then((res) => {
+								let node = document.getElementById('rmidles.' + filename + '.label');
+								node.innerHTML = '<s>%s</s>'.format(node.innerHTML);
+								node = document.getElementById('rmidles.' + filename + '.button');
+								node.classList.add('hidden');
+							});
+						}, filename)
+					}, [ _('Remove') ])
+				])
+			]));
+		});
+
+		ui.showModal(_('Remove idles'), [
+			sectionEl,
+			E('div', { class: 'right' }, [
+				E('button', {
+					class: 'btn cbi-button-action',
+					click: ui.hideModal
+				}, [ _('Complete') ])
+			])
+		]);
+	});
+}
+
 function textvalue2Value(section_id) {
 	let cval = this.cfgvalue(section_id);
 	let i = this.keylist.indexOf(cval);
@@ -754,7 +798,8 @@ return baseclass.extend({
 	updateStatus,
 	handleGenKey,
 	handleReload,
-	textvalue2Value,
+	handleRemoveIdles,
+	textvalue2Value,  // this
 	// validate
 	validateTimeDuration,
 	validateUUID,

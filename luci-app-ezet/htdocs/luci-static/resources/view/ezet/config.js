@@ -3,6 +3,7 @@
 'require poll';
 'require rpc';
 'require uci';
+'require ui';
 'require view';
 
 'require ezet as ez';
@@ -245,6 +246,19 @@ return view.extend({
 		ss.ez_modaltitle = [ _('Instance'), _('Add a instance') ];
 		ss.ez_prefmt = ez.glossary[ss.sectiontype].prefmt;
 		ss.ez_lowcase_only = true;
+		/* Remove idle files start */
+		ss.renderSectionAdd = function(/* ... */) {
+			const node = ez.GridSection.prototype.renderSectionAdd.apply(this, arguments);
+
+			node.appendChild(E('button', {
+				'class': 'cbi-button cbi-button-add',
+				'title': _('Remove idles'),
+				'click': ui.createHandlerFn(this, ez.handleRemoveIdles)
+			}, [ _('Remove idles') ]));
+
+			return node;
+		}
+		/* Remove idle files end */
 
 		ss.tab('field_Base', _('Base fields'));
 		ss.tab('field_secure', _('🔒Secure fields'));
