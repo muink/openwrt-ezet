@@ -220,7 +220,47 @@ return view.extend({
 			s.nodescriptions = true;
 			s.modaltitle = _('Edit credential');
 			//s.ez_modaltitle = [ _('Credential'), _('Add a credential') ];
-			/* Runtime credential generate start */
+			/* Runtime credential generate/revoke start */
+			/* s.handleGenerate = function() {
+				const section_type = this.sectiontype;
+				const o = new ez.HandleImport(this.map, this, _('Import rule-set links'),
+					_('Supports rule-set links of type: <code>%s</code> and format: <code>%s</code>.</br>')
+						.format('file, http, inline', 'text, yaml, mrs') +
+						_('Please refer to <a href="%s" target="_blank">%s</a> for link format standards.')
+							.format(rulesetdoc, _('Ruleset-URI-Scheme')));
+				o.placeholder = 'https://github.com/ACL4SSR/ACL4SSR/raw/refs/heads/master/Clash/Providers/BanAD.yaml?fmt=yaml&behav=classical&	rawq=good%3Djob#BanAD\n' +
+								'https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs?fmt=mrs&behav=domain&	bpath=geo%2Fgeosite%2Fcn.mrs&hdr=eyJVc2VyLUFnZW50IjpbIm1paG9tby8xLjE4LjMiXX0K#CN-Site\n' +
+								'file:///example.txt?fmt=text&behav=domain&fill=LmNuCg#CN%20TLD\n' +
+								'inline://LSAnLmhrJwoK?behav=domain#HK%20TLD\n' +
+								'inline://H4sIAAAAAAACA9NVUNcrKVcHANszKpEHAAAA?behav=domain#TW%20TLD\n';
+				o.handleFn = async function(textarea) {
+					let input_links = textarea.getValue().trim().split('\n');
+					if (!input_links[0]) return ui.hideModal();
+
+					let imported_count = 0;
+					input_links = [...new Set(input_links)]; // Remove duplicate lines
+					for (const link of input_links) {
+						let config = await parseRulesetLink(section_type, link);
+						if (config) {
+							this.write(config);
+							imported_count++;
+						}
+					}
+
+					if (imported_count === 0)
+						ui.addNotification(null, E('p', _('No valid rule-set link found.')));
+					else
+						ui.addNotification(null, E('p', _('Successfully imported %s %s of total %s.')
+							.format(imported_count, _('rule-set'), input_links.length)), 'info');
+
+					if (imported_count)
+						return this.save();
+					else
+						return ui.hideModal();
+				}
+
+				return o.render();
+			}*/
 			s.renderSectionAdd = function(/* ... */) {
 				const node = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
 
@@ -236,7 +276,44 @@ return view.extend({
 			s.handleAdd = function(ev, name) {
 				return form.GridSection.prototype.handleAdd.call(this, ev, ez.generateRand('uuid'));
 			}
-			/* Runtime credential generate end */
+			s.handleRevoke = function(section_id) {
+				ui.showModal(_('Revoke credential'), [
+					E('p', {}, _('Are you sure you want to revoke credential <code>%s</code>?').format(section_id)),
+					E('div', { 'class': 'right' }, [
+						E('button', {
+							'class': 'btn cbi-button',
+							'click': ui.hideModal
+						}, [ _('Cancel') ]),
+						' ',
+						E('button', {
+							'class': 'btn cbi-button cbi-button-negative important',
+							'click': ui.createHandlerFn(this, (section_id) => {
+								this.map.data.remove(this.map.config, section_id);
+								ui.hideModal();
+								return this.map.save();
+							}, section_id)
+						}, [ _('Revoke') ])
+					])
+				], 'cbi-modal');
+			}
+			s.renderRowActions = function(section_id) {
+				const node = form.GridSection.prototype.renderRowActions.apply(this, arguments);
+				const actions = node.querySelector('div');
+				const runtime = this.map.readonly;
+
+				if (actions) {
+					if (runtime)
+						actions.lastChild.classList.add('hidden');
+					actions.appendChild(E('button', {
+						class: 'btn cbi-button cbi-button-remove' + (runtime ? '' : ' hidden'),
+						title: _('Revoke credential'),
+						click: ui.createHandlerFn(this, 'handleRevoke', section_id)
+					}, [ _('Revoke') ]));
+				}
+
+				return node;
+			}
+			/* Runtime credential generate/revoke end */
 
 			o = s.option(form.Value, '.name', _('Credential ID'));
 			o.readonly = true;
