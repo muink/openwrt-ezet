@@ -169,9 +169,44 @@ return view.extend({
 			s.nodescriptions = true;
 			s.modaltitle = _('Edit credential');
 			//s.ez_modaltitle = [ _('Credential'), _('Add a credential') ];
-			/* Runtime credential generate start */
+			/* Runtime credential generate/revoke start */
 			s.handleAdd = function(ev, name) {
 				return form.GridSection.prototype.handleAdd.call(this, ev, name || ez.generateRand('uuid'));
+			}
+			s.handleRevoke = function(section_id) {
+				const revoke = function(section_id) {
+					return ez.cliWrapper([
+						'--instance-name', titles[this.sectiontype],
+						'credential', 'revoke', section_id
+					]).then((res) => {
+						if (res.result) {
+							if (res.result.exitcode == 0) {
+								this.map.data.remove(this.map.config, section_id);
+								return this.map.load()
+									.then(L.bind(this.map.reset, this.map))
+									.then(ui.hideModal)
+									.catch(() => {});
+							} else
+								ui.addNotification(null, E('p', _('Failed to revoke %s, error: %s.').format(section_id, res.result.stderr)), 'error');
+						} else
+							ui.addNotification(null, E('p', _('Failed to revoke %s, error: %s.').format(section_id, res.error)), 'error');
+					});
+				};
+
+				ui.showModal(_('Revoke credential'), [
+					E('p', {}, _('Are you sure you want to revoke credential: <code>%s</code>?').format(section_id)),
+					E('div', { class: 'right' }, [
+						E('button', {
+							class: 'btn cbi-button',
+							click: ui.hideModal
+						}, [ _('Cancel') ]),
+						' ',
+						E('button', {
+							class: 'btn cbi-button cbi-button-negative important',
+							click: ui.createHandlerFn(this, revoke, section_id)
+						}, [ _('Revoke') ])
+					])
+				]);
 			}
 			s.renderSectionAdd = function(/* ... */) {
 				const node = form.GridSection.prototype.renderSectionAdd.apply(this, arguments);
@@ -185,7 +220,24 @@ return view.extend({
 
 				return node;
 			}
-			/* Runtime credential generate end */
+			s.renderRowActions = function(section_id, more_label, trEl) {
+				const node = form.GridSection.prototype.renderRowActions.apply(this, arguments);
+				const actions = node.querySelector('div');
+				const runtime = this.map.readonly;
+
+				if (actions) {
+					if (runtime)
+						actions.lastChild.classList.add('hidden');
+					actions.appendChild(E('button', {
+						class: 'btn cbi-button cbi-button-remove' + (runtime ? '' : ' hidden'),
+						title: _('Revoke credential'),
+						click: ui.createHandlerFn(this, 'handleRevoke', section_id)
+					}, [ _('Revoke') ]));
+				}
+
+				return node;
+			}
+			/* Runtime credential generate/revoke end */
 
 			o = s.option(form.Value, '.name', _('Credential ID'));
 			o.readonly = true;

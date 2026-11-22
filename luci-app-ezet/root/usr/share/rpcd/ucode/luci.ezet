@@ -4,11 +4,11 @@
 
 const less_26 = true;
 
-import { access, basename, dirname, glob, lsdir, lstat, mkdir, popen, readfile, writefile } from 'fs';
+import { access, basename, dirname, glob, lsdir, lstat, mkdir, mkstemp, popen, readfile, writefile } from 'fs';
 import * as digest from 'digest';
 //import * as netaddr from 'netaddr'; // @less_26_??
 import {
-	shellQuote, isEmpty, yqRead, yqReadFile,
+	shellQuote, isEmpty, executeCommand, yqRead, yqReadFile,
 	IPv6CIDR, // @less_26_??
 	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR, RES_TYPE
 } from 'ezet';
@@ -202,6 +202,17 @@ const methods = {
 			}
 
 			return { result };
+		}
+	},
+
+	cli_wrapper: {
+		args: { commands: 'commands' },
+		call: function(req) {
+			const commands = req.args?.commands || '[""]';
+
+			const out = executeCommand(null, 'easytier-cli', ...map(json(commands), cmd => shellQuote(cmd)));
+
+			return { result: out };
 		}
 	},
 

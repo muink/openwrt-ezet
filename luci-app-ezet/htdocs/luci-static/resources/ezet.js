@@ -309,6 +309,17 @@ function isEmpty(res) {
 	return false;
 }
 
+function cliWrapper(commands) {
+	const callCliWrapper = rpc.declare({
+		object: 'luci.ezet',
+		method: 'cli_wrapper',
+		params: ['commands'],
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callCliWrapper(JSON.stringify(commands)), {});
+}
+
 function getFeatures() {
 	const callGetFeatures = rpc.declare({
 		object: 'luci.ezet',
@@ -803,6 +814,7 @@ return baseclass.extend({
 	/* Method */
 	generateRand,
 	isEmpty,
+	cliWrapper,
 	getFeatures,
 	getServiceStatus,
 	getDashURL,
