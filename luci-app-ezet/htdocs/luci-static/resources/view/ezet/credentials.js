@@ -106,6 +106,149 @@ function secondToDuration(uint) {
 	return uint + '';
 }
 
+function renderCredential(s, isGenModal = false, global) {
+	let o;
+
+	o = s.option(form.Value, '.name', _('Credential ID'));
+	o.readonly = true;
+	o.rmempty = false;
+	o.validate = ez.validateUUID;
+
+	if (!isGenModal) {
+		o = s.option(ez.CopyValue, 'secret', _('Credential secret'),
+			_('Base64 encoded X25519 private key.'));
+		o.password = true;
+		o.ez_options = {
+			type: 'wg-keypair',
+			callback: function(result) {
+				return [
+					[this.option, result.private_key],
+					['pubkey', result.public_key]
+				]
+			}
+		}
+		o.validate = function(section_id, value) {
+			if (!value)
+				ez.handleGenKey.call(this, section_id, this.ez_options || this.option);
+
+			return ez.validateBase64Key.call(this, 44, section_id, value);
+		}
+
+		o = s.option(form.Value, 'pubkey', _('Credential pubkey'),
+			_('Base64 encoded X25519 public key.'));
+		o.readonly = true;
+		o.validate = L.bind(ez.validateBase64Key, o, 44);
+		o.modalonly = true;
+
+		o = s.option(CBITimeValue, 'created_at_unix', _('Created'));
+		o.rmempty = false;
+		o.modalonly = true;
+
+		o = s.option(CBITimeValue, 'expiry_unix', _('Expires'));
+		o.rmempty = false;
+		o.textvalue = function(section_id) {
+			const expiry = Number(this.cfgvalue(section_id));
+			const valid = expiry > Math.floor(Date.now() / 1000);
+
+			return E('span', {
+				class: `expiry-status expiry-status-${valid ? 'valid' : 'expired'}`,
+				title: _('Expires: %s').format(formatTime(expiry))
+			}, [ valid ? _('Valid') : _('Expired') ]);
+		}
+
+		o = s.option(form.Value, '_validity', _('Validity'));
+		o.default = '1d';
+		ez.validity_preset.forEach((res) => {
+			o.value.apply(o, res);
+		})
+		o.load = function(section_id) {
+			const created = this.map.data.get(this.section.config, section_id, 'created_at_unix');
+			const expiry = this.map.data.get(this.section.config, section_id, 'expiry_unix');
+			const seconds = expiry - created;
+
+			return seconds ? secondToDuration(seconds) : this.default;
+		}
+		o.validate = function(section_id, value) {
+			const result = ez.validateTimeDuration.apply(this, arguments);
+
+			if (result !== true)
+				return result;
+
+			const created = this.section.getOption('created_at_unix').epochget(section_id);
+			const expiryOpt = this.section.getOption('expiry_unix')
+			const oldexpiry = expiryOpt.epochget(section_id);
+			const newexpiry = created + durationToSecond(value);
+
+			if (!(oldexpiry == newexpiry))
+				expiryOpt.epochset(section_id, newexpiry);
+
+			return true;
+		}
+		o.write = form.DummyValue.prototype.write;
+		o.remove = form.DummyValue.prototype.remove;
+		o.rmempty = false;
+		o.modalonly = true;
+	}
+
+	if (isGenModal) {
+		o = s.option(form.Value, 'ttl', _('Validity'));
+		o.default = '1d';
+		ez.validity_preset.forEach((res) => {
+			o.value.apply(o, res);
+		})
+		o.validate = ez.validateTimeDuration;
+		o.rmempty = false;
+		o.modalonly = true;
+	}
+
+	o = s.option(form.DynamicList, 'groups', _('ACL groups'));
+	o.default = [];
+
+	o = s.option(form.Flag, 'allow_relay', _('Allow relay'),
+		_('Allow ephemeral nodes that join using this credential %s.')
+		.format(_('to relay data traffic for other peers')));
+	o.enabled = 'true';
+	o.disabled = 'false';
+	o.default = o.disabled;
+	o.rmempty = false;
+
+	o = s.option(form.MultiValue, 'allowed_proxy_cidrs', _('Allowed proxy cidrs'),
+		_('Allow ephemeral nodes that join using this credential %s.')
+		.format(_('to advertise the specified CIDR ranges used for <code>%s</code>').format(_('Subnet proxy'))));
+	o.create = true;
+	o.custom_placeholder = '192.168.1.0/24';
+	o.placeholder = '192.168.1.0/24';
+	o.default = [];
+	o.value('', _('-- Please choose --'));
+	o.load = function(section_id) {
+		return ez.loadChoices.call(this, [
+			['', _('-- Please choose --')],
+			...global.localSubnets.filter(e => e.device !== 'lo')
+				.map(e => [e.cidr, E([], [ e.cidr, ' (', E('strong', {}, [e.interface]), ')' ]) ])
+		], section_id);
+	}
+	o.validate = function(section_id, value) {
+		const values = value.split(' ');
+
+		for (value of values) {
+			if (ez.isEmpty(value))
+				return true;
+
+			if (!ez.stubValidator.apply('cidr4', value))
+				return _('Expecting: %s').format(_('valid IPv4 CIDR'));
+		}
+
+		return true;
+	}
+
+	o = s.option(form.Flag, 'reusable', _('Reusable'),
+		_('Allows multiple ephemeral nodes to be online simultaneously.'));
+	o.enabled = 'true';
+	o.disabled = 'false';
+	o.default = o.enabled;
+	o.rmempty = false;
+}
+
 const ucinst = 'instance';
 const CREDENTIAL_FILENAME = 'credentials.json';
 
@@ -239,132 +382,10 @@ return view.extend({
 			}
 			/* Runtime credential generate/revoke end */
 
-			o = s.option(form.Value, '.name', _('Credential ID'));
-			o.readonly = true;
-			o.rmempty = false;
-			o.validate = ez.validateUUID;
-
-			o = s.option(ez.CopyValue, 'secret', _('Credential secret'),
-				_('Base64 encoded X25519 private key.'));
-			o.password = true;
-			o.ez_options = {
-				type: 'wg-keypair',
-				callback: function(result) {
-					return [
-						[this.option, result.private_key],
-						['pubkey', result.public_key]
-					]
-				}
-			}
-			o.validate = function(section_id, value) {
-				if (!value)
-					ez.handleGenKey.call(this, section_id, this.ez_options || this.option);
-
-				return ez.validateBase64Key.call(this, 44, section_id, value);
-			}
-
-			o = s.option(form.Value, 'pubkey', _('Credential pubkey'),
-				_('Base64 encoded X25519 public key.'));
-			o.readonly = true;
-			o.validate = L.bind(ez.validateBase64Key, o, 44);
-			o.modalonly = true;
-
-			o = s.option(CBITimeValue, 'created_at_unix', _('Created'));
-			o.rmempty = false;
-			o.modalonly = true;
-
-			o = s.option(CBITimeValue, 'expiry_unix', _('Expires'));
-			o.rmempty = false;
-			o.textvalue = function(section_id) {
-				const expiry = Number(this.cfgvalue(section_id));
-				const valid = expiry > Math.floor(Date.now() / 1000);
-
-				return E('span', {
-					class: `expiry-status expiry-status-${valid ? 'valid' : 'expired'}`,
-					title: _('Expires: %s').format(formatTime(expiry))
-				}, [ valid ? _('Valid') : _('Expired') ]);
-			}
-
-			o = s.option(form.Value, '_validity', _('Validity'));
-			o.default = '1d';
-			o.value('1h', _('1 hour'));
-			o.value('1d', _('1 day'));
-			o.value('7d', _('7 days'));
-			o.value('30d', _('30 days'));
-			o.load = function(section_id) {
-				const created = this.map.data.get(this.section.config, section_id, 'created_at_unix');
-				const expiry = this.map.data.get(this.section.config, section_id, 'expiry_unix');
-				const seconds = expiry - created;
-
-				return seconds ? secondToDuration(seconds) : this.default;
-			}
-			o.validate = function(section_id, value) {
-				const result = ez.validateTimeDuration.apply(this, arguments);
-
-				if (result !== true)
-					return result;
-
-				const created = this.section.getOption('created_at_unix').epochget(section_id);
-				const expiryOpt = this.section.getOption('expiry_unix')
-				const oldexpiry = expiryOpt.epochget(section_id);
-				const newexpiry = created + durationToSecond(value);
-
-				if (!(oldexpiry == newexpiry))
-					expiryOpt.epochset(section_id, newexpiry);
-
-				return true;
-			}
-			o.write = form.DummyValue.prototype.write;
-			o.remove = form.DummyValue.prototype.remove;
-			o.rmempty = false;
-			o.modalonly = true;
-
-			o = s.option(form.DynamicList, 'groups', _('ACL groups'));
-			o.default = [];
-
-			o = s.option(form.Flag, 'allow_relay', _('Allow relay'),
-				_('Allow ephemeral nodes that join using this credential %s.')
-				.format(_('to relay data traffic for other peers')));
-			o.enabled = 'true';
-			o.disabled = 'false';
-			o.default = o.disabled;
-			o.rmempty = false;
-
-			o = s.option(form.MultiValue, 'allowed_proxy_cidrs', _('Allowed proxy cidrs'),
-				_('Allow ephemeral nodes that join using this credential %s.')
-				.format(_('to advertise the specified CIDR ranges used for <code>%s</code>').format(_('Subnet proxy'))));
-			o.create = true;
-			o.custom_placeholder = '192.168.1.0/24';
-			o.placeholder = '192.168.1.0/24';
-			o.default = [];
-			o.value('', _('-- Please choose --'));
-			o.load = function(section_id) {
-				return ez.loadChoices.call(this, [
-					['', _('-- Please choose --')],
-					...localSubnets.filter(e => e.device !== 'lo')
-						.map(e => [e.cidr, E([], [ e.cidr, ' (', E('strong', {}, [e.interface]), ')' ]) ])
-				], section_id);
-			}
-			o.validate = function(section_id, value) {
-				const values = value.split(' ');
-
-				for (value of values) {
-					if (ez.isEmpty(value))
-						return true;
-
-					if (!ez.stubValidator.apply('cidr4', value))
-						return _('Expecting: %s').format(_('valid IPv4 CIDR'));
-				}
-
-				return true;
-			}
-
-			o = s.option(form.Flag, 'reusable', _('Reusable'),
-				_('Allows multiple ephemeral nodes to be online simultaneously.'));
-			o.enabled = 'true';
-			o.disabled = 'false';
-			o.default = o.enabled;
-			o.rmempty = false;
+			renderCredential(s, false, {
+				isRunning,
+				localSubnets,
+			});
 			/* Credentials END */
 		}
 

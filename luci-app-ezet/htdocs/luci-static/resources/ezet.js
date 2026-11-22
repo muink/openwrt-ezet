@@ -72,6 +72,13 @@ const peers_type = [
 	}
 ];
 
+const validity_preset = [
+	['1h', _('1 hour')],
+	['1d', _('1 day')],
+	['7d', _('7 days')],
+	['30d', _('30 days')],
+];
+
 /* Prototype */
 const CBIGridSection = form.GridSection.extend({
 	modaltitle(/* ... */) {
@@ -801,6 +808,7 @@ return baseclass.extend({
 	log_levels,
 	glossary,
 	peers_type,
+	validity_preset,
 
 	/* Prototype */
 	GridSection: CBIGridSection,
