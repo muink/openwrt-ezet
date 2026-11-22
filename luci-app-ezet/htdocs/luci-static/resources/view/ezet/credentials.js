@@ -6,6 +6,12 @@
 
 'require ezet as ez';
 
+document.querySelector('head').appendChild(E('link', {
+	'rel': 'stylesheet',
+	'type': 'text/css',
+	'href': L.resource('view/ezet/credentials.css')
+}));
+
 const CBITimeValue = form.DummyValue.extend({
 	__name__: 'CBI.TimeValue',
 
@@ -217,6 +223,15 @@ return view.extend({
 
 			o = s.option(CBITimeValue, 'expiry_unix', _('Expires'));
 			o.rmempty = false;
+			o.textvalue = function(section_id) {
+				const expiry = Number(this.cfgvalue(section_id));
+				const valid = expiry > Math.floor(Date.now() / 1000);
+
+				return E('span', {
+					class: `expiry-status expiry-status-${valid ? 'valid' : 'expired'}`,
+					title: _('Expires: %s').format(formatTime(expiry))
+				}, [ valid ? _('Valid') : _('Expired') ]);
+			}
 
 			o = s.option(form.Value, '_validity', _('Validity'));
 			o.default = '1d';
