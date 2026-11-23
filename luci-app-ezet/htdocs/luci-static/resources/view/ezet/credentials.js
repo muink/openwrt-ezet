@@ -360,7 +360,19 @@ return view.extend({
 
 							if (res.result) {
 								if (res.result.exitcode == 0) {
-									/* // @reread the file and update page */
+									const raw = await ez.readFile(ucinst, get_filename(this.sectiontype));
+									const credential = JSON.parse(raw.trim())[section_id];
+
+									if (credential) {
+										const config_name = this.uciconfig ?? this.map.config;
+										this.map.data.add(config_name, this.sectiontype, section_id);
+
+										const section = this.map.data.data[section_id];
+										Object.assign(section, credential);
+									}
+
+									//console.log(this.map.data.data);
+
 									return this.map.load()
 										.then(L.bind(this.map.reset, this.map))
 										.then(ui.hideModal)
