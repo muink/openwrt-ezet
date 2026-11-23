@@ -16,9 +16,9 @@ config web 'console'
 	option api_server_port '11211'
 	option api_host 'http://192.168.1.1:11211'
 
-config instance 'instance_easytiernode'
-	option label 'easytiernode'
-	option network_name 'easytiernode'
+config instance 'instance_example'
+	option label 'ezetnode'
+	option network_name 'ezetnode'
 	option network_secret ''
 	option peers 'peer_DreamLife'
 
