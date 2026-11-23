@@ -2,6 +2,7 @@
 'require baseclass';
 'require form';
 'require fs';
+'require network';
 'require rpc';
 'require uci';
 'require ui';
@@ -206,21 +207,16 @@ const CBICopyValue = form.Value.extend({
 	__name__: 'CBI.CopyValue',
 
 	readonly: true,
+	editable : false,
 
-	renderWidget(section_id, option_index, cfgvalue) {
-		let node = form.Value.prototype.renderWidget.apply(this, arguments);
-
-		if (!this.password)
-			node.classList.add('control-group');
-
-		(node.querySelector('.control-group') || node).lastChild.style.padding = '0 7px';
-		(node.querySelector('.control-group') || node).appendChild(E('button', {
+	renderCopyButton(getValue) {
+		return E('button', {
 			class: 'cbi-button cbi-button-add',
-			style: "margin-left: calc(-.2em + -2px); border-radius: 0 3px 3px 0; padding: 0 4px;",
-			click: ui.createHandlerFn(this, async (section_id) => {
+			click: ui.createHandlerFn(this, async () => {
 				try {
-					await navigator.clipboard.writeText(this.formvalue(section_id));
+					await navigator.clipboard.writeText(String(getValue() ?? ''));
 					console.log('Content copied to clipboard!');
+					alert(_('Content copied to clipboard!'));
 				} catch (e) {
 					console.error('Failed to copy: ', e);
 				}
@@ -230,11 +226,38 @@ const CBICopyValue = form.Value.extend({
 				document.execCommand("copy");
 				inputEl.blur();
 				*/
-				return alert(_('Content copied to clipboard!'));
-			}, section_id)
-		}, [ _('📋') ]));
+			})
+		}, [ _('📋') ]);
+	},
+
+	renderWidget(section_id, option_index, cfgvalue) {
+		const node = form.Value.prototype.renderWidget.apply(this, arguments);
+
+		if (!this.password)
+			node.classList.add('control-group');
+
+		(node.querySelector('.control-group') || node)
+			.appendChild(this.renderCopyButton(() =>
+				this.formvalue(section_id)
+			));
 
 		return node;
+	},
+
+	textvalue(section_id) {
+		const value = this.cfgvalue(section_id) ?? '';
+
+		return E('div', {
+			class: 'control-group'
+		}, [
+			E('input', {
+				type: this.password ? 'password' : 'text',
+				class: this.password ? 'cbi-input-password' : 'cbi-input-text',
+				disabled: this.readonly || null,
+				value: value,
+			}),
+			this.renderCopyButton(() => value)
+		]);
 	}
 });
 
@@ -337,6 +360,50 @@ function getDashURL(instance) {
 		const port = cmd["web-server-port"] || cmd["api-server-port"] || 11211;
 
 		return 'http://%s:%s/'.format(host, port);
+	});
+}
+
+function getNetworkCIDR4(cidr) {
+	const [addr, prefix] = cidr.split('/');
+	const octets = validation.parseIPv4(addr);
+
+	if (!octets || prefix == null)
+		return null;
+
+	const bits = +prefix;
+
+	if (!Number.isInteger(bits) || bits < 0 || bits > 32)
+		return null;
+
+	const network = octets.map((octet, i) => {
+		const n = Math.max(0, Math.min(8, bits - i * 8));
+		const mask = n ? (0xff << (8 - n)) & 0xff : 0;
+
+		return octet & mask;
+	});
+
+	return `${network.join('.')}/${bits}`;
+}
+
+function getLocalSubnets() {
+	return network.getNetworks().then(networks => {
+		const subnets = new Map();
+
+		for (let net of networks) {
+			for (let addr of net.getIPAddrs()) {
+				const cidr = getNetworkCIDR4(addr);
+
+				if (cidr && !subnets.has(cidr)) {
+					subnets.set(cidr, {
+						cidr,
+						interface: net.getName(),
+						device: net.getIfname()
+					});
+				}
+			}
+		}
+
+		return Array.from(subnets.values());
 	});
 }
 
@@ -729,6 +796,8 @@ return baseclass.extend({
 	getFeatures,
 	getServiceStatus,
 	getDashURL,
+	getNetworkCIDR4,
+	getLocalSubnets,
 	ipv6CidrToRange,
 	ipv6RangeContains,
 	// load
