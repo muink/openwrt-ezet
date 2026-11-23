@@ -250,7 +250,12 @@ function renderCredential(s, isGenModal = false, global) {
 }
 
 const ucinst = 'instance';
-const CREDENTIAL_FILENAME = 'credentials.json';
+function get_filename(sectiontype) {
+	return sectiontype + '/credentials.json';
+}
+function get_filepath(sectiontype) {
+	return `${ez.EZ_DIR}/${ucinst}/` + get_filename(sectiontype);
+}
 
 return view.extend({
 	load() {
@@ -280,7 +285,7 @@ return view.extend({
 		try {
 			for (const inst of valid_insts) {
 				const sid_as_styp = inst['.name'];
-				const raw = await L.resolveDefault(ez.readFile(inst['.type'], sid_as_styp + `/${CREDENTIAL_FILENAME}`), '{}');
+				const raw = await L.resolveDefault(ez.readFile(ucinst, get_filename(sid_as_styp)), '{}');
 
 				titles[sid_as_styp] = inst.label;
 				jsonData[sid_as_styp] = Object.entries(JSON.parse(raw.trim())).map(e => Object.assign(e[1], {'.name':e[0]}));
@@ -305,7 +310,7 @@ return view.extend({
 			/* Credentials settings */
 			s = m.section(form.GridSection, sectionType, _('Instance (%s)').format(titles[sectionType]),
 				_('Raw data in: <code>%s</code>')
-				.format(ez.EZ_DIR + `/${ucinst}/${sectionType}/${CREDENTIAL_FILENAME}`));
+				.format(get_filepath(sectionType)));
 			s.anonymous = true;
 			s.addremove = true;
 			s.rowcolors = true;
