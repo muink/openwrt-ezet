@@ -316,6 +316,78 @@ return view.extend({
 			s.handleAdd = function(ev, name) {
 				return form.GridSection.prototype.handleAdd.call(this, ev, name || ez.generateRand('uuid'));
 			}
+			s.handleGenerate = function() {
+				let m, s;
+
+				const section_id = ez.generateRand('uuid');
+				m = new form.JSONMap({
+					[section_id]: {}
+				});
+
+				s = m.section(form.NamedSection, section_id, this.sectiontype);
+
+				renderCredential(s, true, {
+					localSubnets
+				});
+
+				return m.render().then(node => {
+					const generate = async function() {
+						try {
+							// Parse and validate all modal fields first.
+							await m.parse();
+
+							const cfg = m.data.data[section_id];
+
+							const res = await ez.cliWrapper([
+								'--instance-name', titles[this.sectiontype],
+								'credential', 'generate',
+								'--ttl', durationToSecond(cfg.ttl),
+								'--credential-id', section_id,
+								...(ez.isEmpty(cfg.groups) ? [] : ['--groups', cfg.groups.join(',')]),
+								...(cfg.allow_relay === 'true' ? ['--allow-relay'] : []),
+								...(ez.isEmpty(cfg.allowed_proxy_cidrs) ? []
+									: ['--allowed-proxy-cidrs', cfg.allowed_proxy_cidrs.join(',')]
+								),
+								'--reusable', cfg.reusable,
+							]);
+
+							//console.log(res);
+
+							if (res.result) {
+								if (res.result.exitcode == 0) {
+									/* // @reread the file and update page */
+									return this.map.load()
+										.then(L.bind(this.map.reset, this.map))
+										.then(ui.hideModal)
+										.catch(() => {});
+								} else
+									ui.addNotification(null, E('p', _('Failed to generate credential, error: %s.')
+										.format(res.result.stderr)), 'error');
+							} else
+								ui.addNotification(null, E('p', _('Failed to generate credential, error: %s.')
+									.format(res.error)), 'error');
+						} catch (e) {
+							ui.addNotification(null, E('p', _('Failed to generate credential: %s')
+								.format(e.message || e)), 'error');
+						}
+					};
+
+					ui.showModal(_('Generate credential'), [
+						node,
+						E('div', { class: 'button-row' }, [
+							E('button', {
+								class: 'btn cbi-button',
+								click: ui.hideModal
+							}, [ _('Dismiss') ]),
+							' ',
+							E('button', {
+								class: 'btn cbi-button cbi-button-positive important',
+								click: ui.createHandlerFn(this, generate)
+							}, [ _('Generate') ])
+						])
+					], 'cbi-modal');
+				});
+			}
 			s.handleRevoke = function(section_id) {
 				const revoke = function(section_id) {
 					return ez.cliWrapper([
