@@ -50,6 +50,34 @@ const CBITimeValue = form.DummyValue.extend({
 	remove: form.AbstractValue.prototype.remove
 });
 
+const CBIBoolean = form.Flag.extend({
+	__name__: 'CBI.Boolean',
+
+	__init__(...args) {
+		this.super('__init__', args);
+
+		this.enabled = true;
+		this.disabled = false;
+		this.default = this.disabled;
+	},
+
+	load(section_id) {
+		const section = this.ucisection ?? section_id;
+		const option = this.ucioption ?? this.option;
+		// JSONMap.data.get() only supports Array, Object, String. Not Number, Boolean
+		return this.map.data.data[section][option] ?? this.default;
+	},
+
+	write(section_id, formvalue) {
+		const section = this.ucisection ?? section_id;
+		const option = this.ucioption ?? this.option;
+		// JSONMap.data.set() only supports Array, Object, String. Not Number, Boolean
+		this.map.data.data[section][option] = formvalue ?? this.default;
+	},
+
+	remove: this.write
+});
+
 // https://github.com/openwrt/luci/blob/master/modules/luci-mod-system/htdocs/luci-static/resources/view/system/system.js
 function formatTime(epoch) {
 	const date = new Date(epoch * 1000);
@@ -204,11 +232,9 @@ function renderCredential(s, isGenModal = false, global) {
 	o = s.option(form.DynamicList, 'groups', _('ACL groups'));
 	o.default = [];
 
-	o = s.option(form.Flag, 'allow_relay', _('Allow relay'),
+	o = s.option(CBIBoolean, 'allow_relay', _('Allow relay'),
 		_('Allow ephemeral nodes that join using this credential %s.')
 		.format(_('to relay data traffic for other peers')));
-	o.enabled = 'true';
-	o.disabled = 'false';
 	o.default = o.disabled;
 	o.rmempty = false;
 
@@ -241,10 +267,8 @@ function renderCredential(s, isGenModal = false, global) {
 		return true;
 	}
 
-	o = s.option(form.Flag, 'reusable', _('Reusable'),
+	o = s.option(CBIBoolean, 'reusable', _('Reusable'),
 		_('Allows multiple ephemeral nodes to be online simultaneously.'));
-	o.enabled = 'true';
-	o.disabled = 'false';
 	o.default = o.enabled;
 	o.rmempty = false;
 }
@@ -349,7 +373,7 @@ return view.extend({
 								'--ttl', durationToSecond(cfg.ttl),
 								'--credential-id', section_id,
 								...(ez.isEmpty(cfg.groups) ? [] : ['--groups', cfg.groups.join(',')]),
-								...(cfg.allow_relay === 'true' ? ['--allow-relay'] : []),
+								...(cfg.allow_relay ? ['--allow-relay'] : []),
 								...(ez.isEmpty(cfg.allowed_proxy_cidrs) ? []
 									: ['--allowed-proxy-cidrs', cfg.allowed_proxy_cidrs.join(',')]
 								),
