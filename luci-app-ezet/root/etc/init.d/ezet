@@ -10,7 +10,7 @@ CONF="ezet"
 BINCORE="/usr/bin/easytier-core"
 BINWEB="/usr/bin/easytier-web"
 
-HM_DIR="/etc/ezet"
+EZ_DIR="/etc/ezet"
 EXE_DIR="/usr/libexec/ezet"
 SDL_DIR="/usr/share/ezet"
 RUN_DIR="/var/run/ezet"

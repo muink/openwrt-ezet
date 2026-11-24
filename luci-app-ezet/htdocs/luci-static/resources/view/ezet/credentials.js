@@ -143,15 +143,21 @@ function secondToDuration(uint) {
 	return uint + '';
 }
 
+function cloneJSON(value) {
+	return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
 function renderCredential(s, isGenModal = false, global) {
 	let o;
 
+	// Required
 	o = s.option(form.Value, '.name', _('Credential ID'));
 	o.readonly = true;
 	o.rmempty = false;
 	o.validate = ez.validateUUID;
 
 	if (!isGenModal) {
+		// Required
 		o = s.option(ez.CopyValue, 'secret', _('Credential secret'),
 			_('Base64 encoded X25519 private key.'));
 		o.password = true;
@@ -171,16 +177,19 @@ function renderCredential(s, isGenModal = false, global) {
 			return ez.validateBase64Key.call(this, 44, section_id, value);
 		}
 
+		// Required
 		o = s.option(form.Value, 'pubkey', _('Credential pubkey'),
 			_('Base64 encoded X25519 public key.'));
 		o.readonly = true;
 		o.validate = L.bind(ez.validateBase64Key, o, 44);
 		o.modalonly = true;
 
+		// Required
 		o = s.option(CBITimeValue, 'created_at_unix', _('Created'));
 		o.rmempty = false;
 		o.modalonly = true;
 
+		// Required
 		o = s.option(CBITimeValue, 'expiry_unix', _('Expires'));
 		o.rmempty = false;
 		o.textvalue = function(section_id) {
@@ -193,6 +202,7 @@ function renderCredential(s, isGenModal = false, global) {
 			}, [ valid ? _('Valid') : _('Expired') ]);
 		}
 
+		// Required
 		o = s.option(form.Value, '_validity', _('Validity'));
 		o.default = '1d';
 		ez.validity_preset.forEach((res) => {
@@ -228,6 +238,7 @@ function renderCredential(s, isGenModal = false, global) {
 	}
 
 	if (isGenModal) {
+		// Required
 		o = s.option(form.Value, 'ttl', _('Validity'));
 		o.default = '1d';
 		ez.validity_preset.forEach((res) => {
@@ -238,18 +249,21 @@ function renderCredential(s, isGenModal = false, global) {
 		o.modalonly = true;
 	}
 
+	// Optional, but keep default value when empty
 	o = s.option(form.DynamicList, 'groups', _('ACL groups'));
 	o.default = [];
 	o.remove = function(section_id) {
 		this.super('write', section_id, this.default);
 	}
 
+	// Required
 	o = s.option(CBIBoolean, 'allow_relay', _('Allow relay'),
 		_('Allow ephemeral nodes that join using this credential %s.')
 		.format(_('to relay data traffic for other peers')));
 	o.default = o.disabled;
 	o.rmempty = false;
 
+	// Optional, but keep default value when empty
 	o = s.option(form.MultiValue, 'allowed_proxy_cidrs', _('Allowed proxy cidrs'),
 		_('Allow ephemeral nodes that join using this credential %s.')
 		.format(_('to advertise the specified CIDR ranges used for <code>%s</code>').format(_('Subnet proxy'))));
@@ -282,6 +296,7 @@ function renderCredential(s, isGenModal = false, global) {
 		this.super('write', section_id, this.default);
 	}
 
+	// Required
 	o = s.option(CBIBoolean, 'reusable', _('Reusable'),
 		_('Allows multiple ephemeral nodes to be online simultaneously.'));
 	o.default = o.enabled;
@@ -327,7 +342,7 @@ return view.extend({
 				const raw = await L.resolveDefault(ez.readFile(ucinst, get_filename(sid_as_styp)), '{}');
 
 				titles[sid_as_styp] = inst.label;
-				jsonData[sid_as_styp] = Object.entries(JSON.parse(raw.trim())).map(e => Object.assign(e[1], {'.name':e[0]}));
+				jsonData[sid_as_styp] = Object.entries(JSON.parse(raw.trim())).map(e => Object.assign({'.name': e[0]}, e[1]));
 			}
 		} catch (e) {
 			return E('div', { class: 'cbi-map' }, [
@@ -339,7 +354,7 @@ return view.extend({
 
 		//console.log(jsonData, titles);
 
-		m = new form.JSONMap(jsonData, _('Managed Credentials'),
+		m = new form.JSONMap(cloneJSON(jsonData), _('Managed Credentials'),
 			_('Each tab manages the persistent <code>credential_file</code> of one EasyTier room.'));
 		m.readonly = isRunning ? true : false;
 		m.tabbed = true;
@@ -452,7 +467,8 @@ return view.extend({
 					]).then((res) => {
 						if (res.result) {
 							if (res.result.exitcode == 0) {
-								this.map.data.remove(this.map.config, section_id);
+								const config_name = this.uciconfig ?? this.map.config;
+								this.map.data.remove(config_name, section_id);
 								return this.map.load()
 									.then(L.bind(this.map.reset, this.map))
 									.then(ui.hideModal)
@@ -517,6 +533,125 @@ return view.extend({
 			/* Credentials END */
 		}
 
+		m.data.save = async function() {
+			function deJSONMap(section) {
+				const row = {};
+
+				for (const key in section) {
+					if (!Object.prototype.hasOwnProperty.call(section, key) || key.startsWith('.'))
+						continue;
+
+					row[key] = section[key];
+				}
+
+				return row;
+			}
+
+			const orders = [];
+			for (const sid_as_styp in jsonData) {
+				const tabData = jsonData[sid_as_styp]; // Original records
+				const records = this.sections('json', sid_as_styp); // Current records
+
+				// Index original records by credential ID
+				const stored = new Map(
+					tabData.map(record => [
+						record['.name'],
+						deJSONMap(record)
+					])
+				);
+
+				// Index current records by credential ID
+				const cached = new Map(
+					records.map(record => [
+						record['.name'],
+						deJSONMap(record)
+					])
+				);
+
+				// Detect modifications and creations
+				for (const [id, record] of cached) {
+					const action = !stored.has(id) ? 'add' :
+						JSON.stringify(stored.get(id)) !== JSON.stringify(record) ? 'set' : null;
+
+					if (!action)
+						continue;
+
+					console.log(`${sid_as_styp} ${id} ${action === 'add' ? 'created' : 'modified'}.`);
+
+					orders.push({
+						action,
+						sid_as_styp,
+						id,
+						record
+					});
+				}
+
+				// Detect deletions
+				for (const id of stored.keys()) {
+					if (cached.has(id))
+						continue;
+
+					console.log(`${sid_as_styp} ${id} deleted.`);
+
+					orders.push({
+						action: 'del',
+						sid_as_styp,
+						id,
+						record: {}
+					});
+				}
+			}
+
+			if (!orders.length)
+				return;
+
+			//console.log(orders);
+
+			for (const o of orders) {
+				const filename = get_filename(o.sid_as_styp);
+				const key = JSON.stringify(o.id);
+
+				const tabData = jsonData[o.sid_as_styp]; // Original records
+
+				switch (o.action) {
+					case 'set': {
+						await ez.yqReadFile(ucinst, filename, '-i -oj',
+							`.[${key}] = ${JSON.stringify(o.record)}`);
+
+						const index = tabData.findIndex(record => record['.name'] === o.id);
+						if (index >= 0)
+							tabData[index] = Object.assign({'.name': o.id}, cloneJSON(o.record));
+
+						break;
+					}
+					case 'add': {
+						await ez.yqReadFile(ucinst, filename, '-i -oj',
+							`.[${key}] = ${JSON.stringify(o.record)}`);
+
+						tabData.push(Object.assign({'.name': o.id}, cloneJSON(o.record)));
+
+						break;
+					}
+					case 'del': {
+						await ez.yqReadFile(ucinst, filename, '-i -oj',
+							`del(.[${key}])`);
+
+						const index = tabData.findIndex(record => record['.name'] === o.id);
+						if (index >= 0)
+							tabData.splice(index, 1);
+
+						break;
+					}
+					default:
+						break;
+				}
+			}
+		}
+
 		return m.render();
-	}
+	},
+
+	handleSave: null,
+	handleSaveApply: null,
+	handleReset: null
 });

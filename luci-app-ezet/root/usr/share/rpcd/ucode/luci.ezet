@@ -402,6 +402,36 @@ const methods = {
 		}
 	},
 
+	yq_read: {
+		args: { content: 'content', flags: 'flags', command: 'command' },
+		call: function(req) {
+			if (!req.args?.content)
+				return { result: {}};
+
+			if (!req.args?.flags)
+				return { content: null, error: 'illegal flags' };
+
+			return { result: json(trim(yqRead(req.args?.flags, req.args?.command || '.', req.args?.content)) || '{}') };
+		}
+	},
+
+	yq_read_file: {
+		args: { type: 'type', filename: 'filename', flags: 'flags', command: 'command' },
+		call: function(req) {
+			if (!(req.args?.type in RES_TYPE))
+				return { content: null, error: 'illegal type' };
+
+			if ((!req.args?.filename) || match(req.args?.filename, /\.\.\//))
+				return { content: null, error: 'illegal filename' };
+
+			if (!req.args?.flags)
+				return { content: null, error: 'illegal flags' };
+
+			const filepath = `${EZ_DIR}/${req.args?.type}/${req.args?.filename}`;
+			return { result: json(trim(yqReadFile(req.args?.flags, req.args?.command || '.', filepath)) || '{}') };
+		}
+	},
+
 	dir_ls: {
 		args: { type: 'type' },
 		call: function(req) {

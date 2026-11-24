@@ -737,6 +737,28 @@ function validateUniqueValue(section_id, value) {
 	return true;
 }
 
+function yqRead(content, flags, command) {
+	const callYqRead = rpc.declare({
+		object: 'luci.ezet',
+		method: 'yq_read',
+		params: ['content', 'flags', 'command'],
+		expect: { '': {} }
+	});
+
+	return callYqRead(content, flags, command).then(res => res.result);
+}
+
+function yqReadFile(type, filename, flags, command) {
+	const callYqReadFile = rpc.declare({
+		object: 'luci.ezet',
+		method: 'yq_read_file',
+		params: ['type', 'filename', 'flags', 'command'],
+		expect: { '': {} }
+	});
+
+	return callYqReadFile(type, filename, flags, command).then(res => res.result);
+}
+
 function lsDir(type) {
 	const callLsDir = rpc.declare({
 		object: 'luci.ezet',
@@ -851,6 +873,8 @@ return baseclass.extend({
 	validateIPv6Guanet,  // this
 	validateUniqueValue,  // this
 	// file operations
+	yqRead,
+	yqReadFile,
 	lsDir,
 	readFile,
 	writeFile,
