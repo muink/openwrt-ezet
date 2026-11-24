@@ -240,6 +240,9 @@ function renderCredential(s, isGenModal = false, global) {
 
 	o = s.option(form.DynamicList, 'groups', _('ACL groups'));
 	o.default = [];
+	o.remove = function(section_id) {
+		this.super('write', section_id, this.default);
+	}
 
 	o = s.option(CBIBoolean, 'allow_relay', _('Allow relay'),
 		_('Allow ephemeral nodes that join using this credential %s.')
@@ -274,6 +277,9 @@ function renderCredential(s, isGenModal = false, global) {
 		}
 
 		return true;
+	}
+	o.remove = function(section_id) {
+		this.super('write', section_id, this.default);
 	}
 
 	o = s.option(CBIBoolean, 'reusable', _('Reusable'),
