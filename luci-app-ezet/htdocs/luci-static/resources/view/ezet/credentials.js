@@ -24,7 +24,10 @@ const CBITimeValue = form.DummyValue.extend({
 	},
 
 	load(section_id) {
-		const value = this.super('load', section_id);
+		const section = this.ucisection ?? section_id;
+		const option = this.ucioption ?? this.option;
+		// JSONMap.data.get() only supports Array, Object, String. Not Number, Boolean
+		const value = this.map.data.data[section][option];
 
 		return value ?? Math.floor(Date.now() / 1000);
 	},
@@ -46,7 +49,13 @@ const CBITimeValue = form.DummyValue.extend({
 		UIEl.setValue(epoch);
 	},
 
-	write: form.AbstractValue.prototype.write,
+	write(section_id, formvalue) {
+		const section = this.ucisection ?? section_id;
+		const option = this.ucioption ?? this.option;
+		// JSONMap.data.set() only supports Array, Object, String. Not Number, Boolean
+		this.map.data.data[section][option] = Number(formvalue ?? Math.floor(Date.now() / 1000));
+	},
+
 	remove: form.AbstractValue.prototype.remove
 });
 
