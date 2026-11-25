@@ -4,11 +4,11 @@
 
 const less_26 = true;
 
-import { access, basename, dirname, glob, lsdir, lstat, mkdir, popen, readfile, writefile } from 'fs';
+import { access, basename, dirname, glob, lsdir, lstat, mkdir, mkstemp, popen, readfile, writefile } from 'fs';
 import * as digest from 'digest';
 //import * as netaddr from 'netaddr'; // @less_26_??
 import {
-	shellQuote, isEmpty, yqRead, yqReadFile,
+	shellQuote, isEmpty, executeCommand, yqRead, yqReadFile,
 	IPv6CIDR, // @less_26_??
 	EZ_DIR, EXE_DIR, SDL_DIR, RUN_DIR, RES_TYPE
 } from 'ezet';
@@ -205,6 +205,17 @@ const methods = {
 		}
 	},
 
+	cli_wrapper: {
+		args: { commands: 'commands' },
+		call: function(req) {
+			const commands = req.args?.commands || '[""]';
+
+			const out = executeCommand(null, 'easytier-cli', ...map(json(commands), cmd => shellQuote(cmd)));
+
+			return { result: out };
+		}
+	},
+
 	get_features: {
 		call: function() {
 			let features = {};
@@ -388,6 +399,36 @@ const methods = {
 			if (filestat)
 				writefile(`${RUN_DIR}/${req.args?.type}.log`, '');
 			return { result: true };
+		}
+	},
+
+	yq_read: {
+		args: { content: 'content', flags: 'flags', command: 'command' },
+		call: function(req) {
+			if (!req.args?.content)
+				return { result: {}};
+
+			if (!req.args?.flags)
+				return { content: null, error: 'illegal flags' };
+
+			return { result: json(trim(yqRead(req.args?.flags, req.args?.command || '.', req.args?.content)) || '{}') };
+		}
+	},
+
+	yq_read_file: {
+		args: { type: 'type', filename: 'filename', flags: 'flags', command: 'command' },
+		call: function(req) {
+			if (!(req.args?.type in RES_TYPE))
+				return { content: null, error: 'illegal type' };
+
+			if ((!req.args?.filename) || match(req.args?.filename, /\.\.\//))
+				return { content: null, error: 'illegal filename' };
+
+			if (!req.args?.flags)
+				return { content: null, error: 'illegal flags' };
+
+			const filepath = `${EZ_DIR}/${req.args?.type}/${req.args?.filename}`;
+			return { result: json(trim(yqReadFile(req.args?.flags, req.args?.command || '.', filepath)) || '{}') };
 		}
 	},
 

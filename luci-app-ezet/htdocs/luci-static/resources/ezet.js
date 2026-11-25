@@ -72,6 +72,13 @@ const peers_type = [
 	}
 ];
 
+const validity_preset = [
+	['1h', _('1 hour')],
+	['1d', _('1 day')],
+	['7d', _('7 days')],
+	['30d', _('30 days')],
+];
+
 /* Prototype */
 const CBIGridSection = form.GridSection.extend({
 	modaltitle(/* ... */) {
@@ -307,6 +314,17 @@ function isEmpty(res) {
 		return Object.keys(res).length === 0;                                    // empty Object
 	}
 	return false;
+}
+
+function cliWrapper(commands) {
+	const callCliWrapper = rpc.declare({
+		object: 'luci.ezet',
+		method: 'cli_wrapper',
+		params: ['commands'],
+		expect: { '': {} }
+	});
+
+	return L.resolveDefault(callCliWrapper(JSON.stringify(commands)), {});
 }
 
 function getFeatures() {
@@ -629,6 +647,16 @@ function textvalue2Value(section_id) {
 	return this.vallist[i] ?? cval;
 }
 
+function validateTimeDuration(section_id, value) {
+	if (!value)
+		return true;
+
+	if (!value.match(/^(\d+)(s|m|h|d)?$/))
+		return _('Expecting: %s').format('^(\\d+)(s|m|h|d)?$');
+
+	return true;
+}
+
 function validateUUID(section_id, value) {
 	if (!value)
 		return true;
@@ -709,6 +737,28 @@ function validateUniqueValue(section_id, value) {
 	return true;
 }
 
+function yqRead(content, flags, command) {
+	const callYqRead = rpc.declare({
+		object: 'luci.ezet',
+		method: 'yq_read',
+		params: ['content', 'flags', 'command'],
+		expect: { '': {} }
+	});
+
+	return callYqRead(content, flags, command).then(res => res.result);
+}
+
+function yqReadFile(type, filename, flags, command) {
+	const callYqReadFile = rpc.declare({
+		object: 'luci.ezet',
+		method: 'yq_read_file',
+		params: ['type', 'filename', 'flags', 'command'],
+		expect: { '': {} }
+	});
+
+	return callYqReadFile(type, filename, flags, command).then(res => res.result);
+}
+
 function lsDir(type) {
 	const callLsDir = rpc.declare({
 		object: 'luci.ezet',
@@ -780,6 +830,7 @@ return baseclass.extend({
 	log_levels,
 	glossary,
 	peers_type,
+	validity_preset,
 
 	/* Prototype */
 	GridSection: CBIGridSection,
@@ -793,6 +844,7 @@ return baseclass.extend({
 	/* Method */
 	generateRand,
 	isEmpty,
+	cliWrapper,
 	getFeatures,
 	getServiceStatus,
 	getDashURL,
@@ -813,6 +865,7 @@ return baseclass.extend({
 	handleRemoveIdles,
 	textvalue2Value,  // this
 	// validate
+	validateTimeDuration,
 	validateUUID,
 	validateUrl,
 	validateBase64Key,  // this
@@ -820,6 +873,8 @@ return baseclass.extend({
 	validateIPv6Guanet,  // this
 	validateUniqueValue,  // this
 	// file operations
+	yqRead,
+	yqReadFile,
 	lsDir,
 	readFile,
 	writeFile,
