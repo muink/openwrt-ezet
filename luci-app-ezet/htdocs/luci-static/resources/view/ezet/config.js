@@ -236,6 +236,18 @@ return view.extend({
 		so.datatype = 'hostname';
 		so.placeholder = hostInfo.hostname;
 
+		so = ss.option(form.Value, 'rpc_portal', _('RPC portal'),
+			_('RPC portal address to listen for management.'));
+		so.datatype = 'hostport';
+		so.placeholder = '127.0.0.1:15888';
+
+		so = ss.option(form.DynamicList, 'rpc_portal_whitelist', _('RPC portalr whitelist'),
+			_('Only allow these addresses to access rpc portal.'));
+		so.datatype = 'ipaddr';
+		so.placeholder = '127.0.0.0/8';
+		so.default = ['127.0.0.1', '127.0.0.0/8', '::1/128'];
+		so.rmempty = false;
+
 		/* Instances management */
 		o = s.taboption('general', form.SectionValue, '_instance', ez.GridSection, 'instance', _('Instances management'));
 		ss = o.subsection;

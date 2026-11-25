@@ -7,6 +7,9 @@ config core 'global'
 	option file_log_level 'off'
 	option file_log_size '5' # in MB
 	option file_log_count '1'
+	list rpc_portal_whitelist '127.0.0.1'
+	list rpc_portal_whitelist '127.0.0.0/8'
+	list rpc_portal_whitelist '::1/128'
 
 config web 'console'
 	option console_log_level 'warn'

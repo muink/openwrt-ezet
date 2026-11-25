@@ -38,6 +38,8 @@ const config_server = uci.get(uciconf, uciglobal, 'config_server'),
       file_log_level = uci.get(uciconf, uciglobal, 'file_log_level') || 'off',
       file_log_size = strToInt(uci.get(uciconf, uciglobal, 'file_log_size')) ?? 5,
       file_log_count = strToInt(uci.get(uciconf, uciglobal, 'file_log_count')) ?? 1,
+	  rpc_portal = uci.get(uciconf, uciglobal, 'rpc_portal') || '127.0.0.1:15888',
+	  rpc_portal_whitelist = uci.get(uciconf, uciglobal, 'rpc_portal_whitelist') || [],
       auto_ipv6_gua_prefix = ubus.call('luci.ezet', 'detect_ipv6_gua_prefix').result?.pd;
 
 /* UCI config END */
@@ -121,8 +123,8 @@ const options = removeBlankAttrs({
 	"file-log-count": file_log_count,
 
 	/* RPC settings */
-	//// "rpc-portal": ,
-	//// "rpc-portal-whitelist": ,
+	"rpc-portal": rpc_portal,
+	"rpc-portal-whitelist": join(',', rpc_portal_whitelist),
 });
 
 const configs = [];
