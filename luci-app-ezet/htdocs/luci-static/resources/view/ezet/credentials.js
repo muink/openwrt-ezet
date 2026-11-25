@@ -184,6 +184,23 @@ function renderCredential(s, isGenModal = false, global) {
 		o.validate = L.bind(ez.validateBase64Key, o, 44);
 		o.modalonly = true;
 
+		o = s.option(form.MultiValue, '_onlines', _('Online devices'));
+		o.readonly = true;
+		o.load = function(section_id) {
+			const credentials = global.onlinePeers[this.section.sectiontype];
+
+			let value = '—'; // when running instances is 0 (not include web instances)
+			if (Object.keys(credentials).length > 0) {
+				const peers = credentials[section_id];
+				value = peers.map(p => p.hostname);
+			}
+
+			return value;
+		}
+		o.write = form.DummyValue.prototype.write;
+		o.remove = form.DummyValue.prototype.remove;
+		o.modalonly = false;
+
 		// Required
 		o = s.option(CBITimeValue, 'created_at_unix', _('Created'));
 		o.rmempty = false;
@@ -336,6 +353,7 @@ return view.extend({
 
 		const jsonData = {};
 		const titles = {};
+		const onlinePeers = {};
 		try {
 			for (const inst of valid_insts) {
 				const sid_as_styp = inst['.name'];
@@ -348,6 +366,18 @@ return view.extend({
 
 				titles[sid_as_styp] = inst.label;
 				jsonData[sid_as_styp] = Object.entries(JSON.parse(raw.trim())).map(e => Object.assign({'.name': e[0]}, e[1]));
+				onlinePeers[sid_as_styp] = {};
+				await ez.cliWrapper([
+					'--instance-name', titles[sid_as_styp],
+					'-o', 'json', 'credential', 'peers'
+				]).then(res => {
+					if (res.result && res.result.stdout) {
+						const result = JSON.parse(res.result.stdout);
+						onlinePeers[sid_as_styp] = Object.fromEntries(
+							result.credentials.map(o => [o.credential_id, o.peers])
+						);
+					}
+				});
 			}
 		} catch (e) {
 			return E('div', { class: 'cbi-map' }, [
@@ -534,6 +564,7 @@ return view.extend({
 			renderCredential(s, false, {
 				isRunning,
 				localSubnets,
+				onlinePeers
 			});
 			/* Credentials END */
 		}
