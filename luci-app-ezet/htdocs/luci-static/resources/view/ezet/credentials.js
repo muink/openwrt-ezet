@@ -224,7 +224,7 @@ function renderCredential(s, isGenModal = false, global) {
 			const created = this.section.getOption('created_at_unix').epochget(section_id);
 			const expiryOpt = this.section.getOption('expiry_unix')
 			const oldexpiry = expiryOpt.epochget(section_id);
-			const newexpiry = created + durationToSecond(value);
+			const newexpiry = created + (durationToSecond(value) || 1);
 
 			if (!(oldexpiry == newexpiry))
 				expiryOpt.epochset(section_id, newexpiry);
@@ -339,7 +339,12 @@ return view.extend({
 		try {
 			for (const inst of valid_insts) {
 				const sid_as_styp = inst['.name'];
-				const raw = await L.resolveDefault(ez.readFile(ucinst, get_filename(sid_as_styp)), '{}');
+				let raw = await L.resolveDefault(
+					ez.readFile(ucinst, get_filename(sid_as_styp)), '');
+				if (!raw) {
+					ez.writeFile(ucinst, get_filename(sid_as_styp), '{}');
+					raw = '{}';
+				}
 
 				titles[sid_as_styp] = inst.label;
 				jsonData[sid_as_styp] = Object.entries(JSON.parse(raw.trim())).map(e => Object.assign({'.name': e[0]}, e[1]));
@@ -400,7 +405,7 @@ return view.extend({
 							const res = await ez.cliWrapper([
 								'--instance-name', titles[this.sectiontype],
 								'credential', 'generate',
-								'--ttl', durationToSecond(cfg.ttl),
+								'--ttl', durationToSecond(cfg.ttl) || 1,
 								'--credential-id', section_id,
 								...(ez.isEmpty(cfg.groups) ? [] : ['--groups', cfg.groups.join(',')]),
 								...(cfg.allow_relay ? ['--allow-relay'] : []),
@@ -606,6 +611,9 @@ return view.extend({
 				return;
 
 			//console.log(orders);
+
+			// @Cache orders (top right)
+			// @Squash orders
 
 			for (const o of orders) {
 				const filename = get_filename(o.sid_as_styp);
