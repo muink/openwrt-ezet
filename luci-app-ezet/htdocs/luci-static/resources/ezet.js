@@ -42,7 +42,7 @@ const glossary = {
 		prefmt: 'listener_%s',
 	},
 	stun_server: {
-		prefmt: 'stun_server_%s',
+		prefmt: 'stun_%s',
 	},
 };
 

@@ -25,6 +25,42 @@ config instance 'instance_example'
 	option network_secret ''
 	option peers 'peer_DreamLife'
 
+config stun_server
+	option label 'HiTV'
+	option host 'stun.hitv.com:3478'
+	option l3 'ipv4'
+	option capabilities 'udp'
+
+config stun_server
+	option label 'pure-ip'
+	option host 'stun.pure-ip.com'
+	option l3 'ipv4,ipv6'
+	option capabilities 'udp,tcp'
+
+config stun_server
+	option label 'Easytier'
+	option host '[2402:4e00:c054:d400:687c:1516:c4d6:0]:8489'
+	option l3 'ipv6'
+	option capabilities 'udp'
+
+config stun_server
+	option label 'fitauto'
+	option host 'stun.fitauto.ru'
+	option l3 'ipv4'
+	option capabilities 'udp,tcp'
+
+config stun_server
+	option label 'CloudFlare'
+	option host 'turn.cloudflare.com'
+	option l3 'ipv4'
+	option capabilities 'udp,tcp,tls'
+
+config stun_server
+	option label 'Google'
+	option host 'stun4.l.google.com:19302'
+	option l3 'ipv4,ipv6'
+	option capabilities 'udp'
+
 config peer 'peer_Official'
 	option label 'Official'
 	option uri 'tcp://public.easytier.top:11010'

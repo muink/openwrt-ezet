@@ -543,11 +543,109 @@ return view.extend({
 		so.modalonly = true;
 		/* General END */
 
+		/* STUN START */
+		s.tab('stun', _('STUN'));
+
+		/* Global settings */
+		o = s.taboption('stun', form.SectionValue, '_stun', form.NamedSection, 'global', 'core', _('Global settings'));
+		ss = o.subsection;
+
+		so = ss.option(form.Flag, 'override_stun', _('Custom STUN'),
+			_('Override default STUN servers.'));
+		so.default = so.disabled;
+		so.validate = function(section_id, value) {
+			const widget = this.getUIElement(section_id).node.querySelector('input');
+			const capabilities = {ipv4: new Set, ipv6: new Set};
+
+			this.map.data.sections(this.config, 'stun_server', cfg => {
+				if (cfg.enabled === '0')
+					return;
+
+				for (const l3 of cfg.l3.split(','))
+					cfg.capabilities.split(',').forEach(e => capabilities[l3].add(e));
+			});
+
+			const ipv4valid = ['udp', 'tcp'].every(e => capabilities['ipv4'].has(e));
+			const ipv6valid = ['udp'].every(e => capabilities['ipv6'].has(e));
+
+			// Force disabled
+			if (ipv4valid || ipv6valid)
+				widget.removeAttribute('disabled');
+			else {
+				widget.checked = false;
+				widget.disabled = true;
+			}
+
+			if (!ipv4valid)
+				return _('Expecting: %s').format(_('collection of %s STUN servers that support %s')
+				.format(_('IPv4'), _('UDP/TCP')));
+
+			if (!ipv6valid)
+				return _('Expecting: %s').format(_('collection of %s STUN servers that support %s')
+				.format(_('IPv6'), _('UDP')));
+
+			return true;
+		}
+
+		/* STUN grid */
+		o = s.taboption('stun', form.SectionValue, '_stun_server', ez.GridSection, 'stun_server', _('Alternative STUN server'));
+		ss = o.subsection;
+		ss.anonymous = true;
+		ss.addremove = true;
+		ss.rowcolors = true;
+		ss.sortable = true;
+		ss.nodescriptions = true;
+		ss.ez_modaltitle = [ _('STUN'), _('Add a STUN server') ];
+		//ss.ez_prefmt = ez.glossary[ss.sectiontype].prefmt;
+		//ss.ez_lowcase_only = false;
+		ss.renderSectionAdd = form.GridSection.prototype.renderSectionAdd;
+		ss.handleAdd = form.GridSection.prototype.handleAdd;
+
+		so = ss.option(form.Value, 'label', _('Label'));
+		so.load = ez.loadDefaultLabel;
+		so.validate = ez.validateUniqueValue;
+		so.modalonly = true;
+
+		so = ss.option(form.Flag, 'enabled', _('Enable'));
+		so.default = so.enabled;
+		so.editable = true;
+
+		so = ss.option(form.Value, 'host', _('Server address'));
+		so.datatype = 'or(host, hostport, ipaddrport(1))';
+		so.placeholder = 'stun.hot-chilli.net[:3478]';
+		so.rmempty = false;
+
+		so = ss.option(form.MultiValue, 'l3', _('L3 protocol'));
+		so.default = 'ipv4';
+		so.value('ipv4', _('IPv4'));
+		so.value('ipv6', _('IPv6'));
+		so.load = function(section_id) {
+			return this.super('load', section_id)?.split(',');
+		}
+		so.write = function(section_id, formvalue) {
+			return this.super('write', section_id, formvalue.join(','));
+		}
+		so.rmempty = false;
+
+		so = ss.option(form.MultiValue, 'capabilities', _('Capabilities'));
+		so.default = 'udp';
+		so.value('udp', _('UDP'));
+		so.value('tcp', _('TCP'));
+		so.value('tls', _('TLS'));
+		so.load = function(section_id) {
+			return this.super('load', section_id)?.split(',');
+		}
+		so.write = function(section_id, formvalue) {
+			return this.super('write', section_id, formvalue.join(','));
+		}
+		so.rmempty = false;
+		/* STUN END */
+
 		/* Peers START */
 		s.tab('peers', _('Peers'));
 
 		/* Peers grid */
-		o = s.taboption('peers', form.SectionValue, '_peer', ez.GridSection, 'peer', null);
+		o = s.taboption('peers', form.SectionValue, '_peer', ez.GridSection, 'peer', _('Peers management'));
 		ss = o.subsection;
 		ss.addremove = true;
 		ss.rowcolors = true;
@@ -580,7 +678,7 @@ return view.extend({
 		s.tab('listeners', _('Listeners'));
 
 		/* Listeners grid */
-		o = s.taboption('listeners', form.SectionValue, '_listener', ez.GridSection, 'listener', null);
+		o = s.taboption('listeners', form.SectionValue, '_listener', ez.GridSection, 'listener', _('Listeners management'));
 		ss = o.subsection;
 		ss.addremove = true;
 		ss.rowcolors = true;

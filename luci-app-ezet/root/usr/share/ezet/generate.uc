@@ -40,7 +40,21 @@ const config_server = uci.get(uciconf, uciglobal, 'config_server'),
       file_log_count = strToInt(uci.get(uciconf, uciglobal, 'file_log_count')) ?? 1,
 	  rpc_portal = uci.get(uciconf, uciglobal, 'rpc_portal') || '127.0.0.1:15888',
 	  rpc_portal_whitelist = uci.get(uciconf, uciglobal, 'rpc_portal_whitelist') || [],
-      auto_ipv6_gua_prefix = ubus.call('luci.ezet', 'detect_ipv6_gua_prefix').result?.pd;
+      auto_ipv6_gua_prefix = ubus.call('luci.ezet', 'detect_ipv6_gua_prefix').result?.pd,
+      override_stun = strToBool(uci.get(uciconf, uciglobal, 'override_stun'));
+
+/* All STUN server array */
+const stunservers = [];
+uci.foreach(uciconf, ucistun, (cfg) => {
+	if (cfg.enabled === '0')
+		return;
+
+	push(stunservers, {
+		host: cfg.host,
+		...arrToObj(map(split(cfg.l3, ','), e => [e, true])),
+		...arrToObj(map(split(cfg.capabilities, ','), e => [e, true])),
+	});
+});
 
 /* UCI config END */
 
@@ -182,6 +196,13 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 				local_private_key: cfg.credential || cfg.local_private_key,
 				local_public_key: cfg.credential ? null : cfg.local_public_key,
 			}
+		} : {}),
+
+		/* STUN settings */
+		...(strToBool(override_stun) ? {
+			stun_servers: map(filter(stunservers, e => e.udp), e => e.host),
+			stun_servers_v6: map(filter(stunservers, e => e.ipv6), e => e.host),
+			tcp_stun_servers: map(filter(stunservers, e => e.tcp), e => e.host),
 		} : {}),
 
 		/* Peers settings */
