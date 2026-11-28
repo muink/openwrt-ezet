@@ -139,6 +139,13 @@ const options = removeBlankAttrs({
 	/* RPC settings */
 	"rpc-portal": rpc_portal,
 	"rpc-portal-whitelist": join(',', rpc_portal_whitelist),
+
+	/* STUN settings */
+	...(override_stun ? {
+		"stun-servers": join(',', map(filter(stunservers, e => e.udp), e => e.host)),
+		"stun-servers-v6": join(',', map(filter(stunservers, e => e.ipv6), e => e.host)),
+		"tcp-stun-servers": join(',', map(filter(stunservers, e => e.tcp), e => e.host)),
+	} : {}),
 });
 
 const configs = [];
@@ -199,11 +206,13 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		} : {}),
 
 		/* STUN settings */
-		...(strToBool(override_stun) ? {
+		/*
+		...(override_stun ? {
 			stun_servers: map(filter(stunservers, e => e.udp), e => e.host),
 			stun_servers_v6: map(filter(stunservers, e => e.ipv6), e => e.host),
 			tcp_stun_servers: map(filter(stunservers, e => e.tcp), e => e.host),
 		} : {}),
+		*/
 
 		/* Peers settings */
 		peer: filter(get_peers(cfg.peers) || [], v => !isEmpty(v)),
