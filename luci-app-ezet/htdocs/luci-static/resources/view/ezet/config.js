@@ -420,18 +420,41 @@ return view.extend({
 					return _('Expecting: %s').format(_('IPv4 CIDR or IPv4 CIDR mapping (real->mapped).'));
 				else if (parts.length === 2) {
 					if (!ez.stubValidator.apply('cidr4', parts[1]))
-						return _('Expecting: %s').format(_('Valid mapped IPv4 CIDR.'));
+						return _('Expecting: %s').format(_('valid mapped IPv4 CIDR.'));
 
 					const prefix = cidr => cidr.split('/')[1];
 
 					if (prefix(parts[0]) !== prefix(parts[1]))
-						return _('Expecting: %s').format(_('Mapped CIDR must have the same prefix length as the original CIDR.'));
+						return _('Expecting: %s').format(_('mapped CIDR must have the same prefix length as the original CIDR.'));
 				} else if (!ez.stubValidator.apply('cidr4', parts[0]))
-					return _('Expecting: %s').format(_('Valid real IPv4 CIDR.'));
+					return _('Expecting: %s').format(_('valid real IPv4 CIDR.'));
 			}
 
 			return true;
-		};
+		}
+		so.modalonly = true;
+
+		so = ss.taboption('field_Base', form.MultiValue, 'exit_nodes', _('Exit nodes'),
+			_('Exit nodes to forward all traffic to.') + '</br>' +
+			_('Allows %s').format(_('Virtual IPv4 address') + '/' + _('Virtual IPv6 address') + '/' + _('IPv6 GUA')) + '</br>' +
+			_('Specify which peers should forward traffic destined for external IPs.'));
+		so.create = true;
+		so.custom_placeholder = '10.11.12.3';
+		so.placeholder = '10.11.12.3';
+		so.value('', _('-- Please choose --'));
+		so.validate = function(section_id, value) {
+			const values = value.split(' ');
+
+			for (value of values) {
+				if (ez.isEmpty(value))
+					return true;
+
+				if (!ez.stubValidator.apply('ipaddr', value, [1]))
+					return _('Expecting: %s').format(_('valid IP address.'));
+			}
+
+			return true;
+		}
 		so.modalonly = true;
 
 		/** Secure fields **/

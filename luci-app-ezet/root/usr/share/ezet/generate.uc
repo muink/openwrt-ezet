@@ -211,6 +211,9 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		/* Proxy networks settings */
 		proxy_network: filter(get_proxy_networks(cfg.proxy_networks) || [], v => !isEmpty(v)),
 
+		/* Exit nodes settings */
+		exit_nodes: cfg.exit_nodes || [],
+
 		/* Listener settings */
 		...(strToBool(cfg.no_listener) ? {
 			listeners: [],
