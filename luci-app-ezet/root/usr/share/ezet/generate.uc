@@ -222,7 +222,8 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		routes: cfg.routes || [],
 		exit_nodes: cfg.exit_nodes || [],
 
-		/* Listener settings */
+		/* Server settings */
+		socks5_proxy: cfg.socks5_proxy ? 'socks5://' + cfg.socks5_proxy : null,
 		...(strToBool(cfg.no_listener) ? {
 			listeners: [],
 		} : {

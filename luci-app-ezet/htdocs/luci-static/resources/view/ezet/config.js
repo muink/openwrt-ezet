@@ -420,8 +420,8 @@ return view.extend({
 
 		/** Routes fields **/
 		so = ss.taboption('field_routes', form.MultiValue, 'proxy_networks', _('Subnet proxy'),
-			_('Open local IPv4 subnets to other peers via this node in the EasyTier network.') + '</br>' +
-			_('Or mapping the local subnet to a non-overlapping IPv4 subnet in the EasyTier network.') + '</br>' +
+			_('Open local IPv4 subnets to other peers via this node in the virtual network.') + '</br>' +
+			_('Or mapping the local subnet to a non-overlapping IPv4 subnet in the virtual network.') + '</br>' +
 			_('Other peers can access the local devices through the mapped addresses.'));
 		so.create = true;
 		so.custom_placeholder = '192.168.1.0/24[->198.18.1.0/24]';
@@ -462,7 +462,7 @@ return view.extend({
 		so.modalonly = true;
 
 		so = ss.taboption('field_routes', form.MultiValue, 'routes', _('Manual routes'),
-			_('Manually specify the IPv4 subnets to be accessed via the EasyTier network.') + '</br>' +
+			_('Manually specify the IPv4 subnets to be accessed via the virtual network.') + '</br>' +
 			_('%s and %s will no longer be automatically installed.')
 			.format(_('Subnet proxy'), _('Wireguard routes propagated from peers')));
 		so.create = true;
@@ -485,7 +485,7 @@ return view.extend({
 		so.modalonly = true;
 
 		so = ss.taboption('field_routes', form.MultiValue, 'exit_nodes', _('Exit gateways'),
-			_('Exit nodes are used to forward traffic destined for outside the EasyTier network.') + '</br>' +
+			_('Exit nodes are used to forward traffic destined for outside the virtual network.') + '</br>' +
 			_('Allows %s').format(_('Virtual IPv4 address') + '/' + _('Virtual IPv6 address') + '/' + _('IPv6 GUA')));
 		so.create = true;
 		so.custom_placeholder = '10.11.12.3';
@@ -564,6 +564,11 @@ return view.extend({
 		so = ss.taboption('field_server', form.Flag, 'enable_exit_node', _('As exit gateway'),
 			_('Allow this node to be an exit gateway.'));
 		so.default = so.disabled;
+
+		so = ss.taboption('field_server', form.Value, 'socks5_proxy', _('Socks5 server'),
+			_('Allow socks5 client to access virtual network.'));
+		so.datatype = 'ipaddrport(1)';
+		so.placeholder = '0.0.0.0:1080';
 
 		so = ss.taboption('field_server', form.Flag, 'no_listener', _('No listener'));
 		so.default = so.disabled;
