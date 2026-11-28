@@ -273,8 +273,8 @@ return view.extend({
 		/* Remove idle files end */
 
 		ss.tab('field_Base', _('Base fields'));
-		ss.tab('field_secure', _('🔒Secure fields'));
-		ss.tab('field_routes', _('Routes fields'));
+		ss.tab('field_advanced', _('Advanced fields'));
+		ss.tab('field_route', _('Route fields'));
 		ss.tab('field_server', _('Server fields'));
 
 		/** Base fields **/
@@ -300,14 +300,6 @@ return view.extend({
 		so.password = true;
 		so.validate = L.bind(ez.validateBase64Key, so, 44);
 		so.modalonly = true;
-
-		so = ss.taboption('field_Base', form.Flag, 'private_mode', _('Serve members only'),
-			_('This node perform handshake or relay traffic only with nodes that:') + '</br>' +
-			_('Node use the same %s and %s as this network.')
-				.format(_('Room name'), _('Room secret')) + '</br>' +
-			_('Or temporary-credential node is already trusted via admin-issued credential propagation.'));
-		so.default = so.disabled;
-		so.editable = true;
 
 		so = ss.taboption('field_Base', form.Flag, 'secure_mode', _('🔒Secure mode'));
 		so.default = so.disabled;
@@ -393,8 +385,16 @@ return view.extend({
 		so.rmempty = false;
 		so.modalonly = true;
 
-		/** Secure fields **/
-		so = ss.taboption('field_secure', ez.GenValue, 'local_private_key', _('Client private key'),
+		/** Advanced fields **/
+		so = ss.taboption('field_advanced', form.Flag, 'private_mode', _('Serve members only'),
+			_('This node perform handshake or relay traffic only with nodes that:') + '</br>' +
+			_('Node use the same %s and %s as this network.')
+				.format(_('Room name'), _('Room secret')) + '</br>' +
+			_('Or temporary-credential node is already trusted via admin-issued credential propagation.'));
+		so.default = so.disabled;
+		so.editable = true;
+
+		so = ss.taboption('field_advanced', ez.GenValue, 'local_private_key', _('Client private key'),
 			_('Base64 encoded X25519 private key.'));
 		so.password = true;
 		so.ez_options = {
@@ -412,14 +412,19 @@ return view.extend({
 		so.depends({secure_mode: '1', credential: ''});
 		so.modalonly = true;
 
-		so = ss.taboption('field_secure', ez.CopyValue, 'local_public_key', _('Client public key'),
+		so = ss.taboption('field_advanced', ez.CopyValue, 'local_public_key', _('Client public key'),
 			_('Base64 encoded X25519 public key.'));
 		so.retain = true;
 		so.depends({secure_mode: '1', credential: ''});
 		so.modalonly = true;
 
-		/** Routes fields **/
-		so = ss.taboption('field_routes', form.MultiValue, 'proxy_networks', _('Subnet proxy'),
+		so = ss.taboption('field_advanced', form.Value, 'socks5_proxy', _('Socks5 server'),
+			_('Allow socks5 client to access virtual network via this server.'));
+		so.datatype = 'ipaddrport(1)';
+		so.placeholder = '0.0.0.0:1080';
+
+		/** Route fields **/
+		so = ss.taboption('field_route', form.MultiValue, 'proxy_networks', _('Subnet proxy'),
 			_('Open local IPv4 subnets to other peers via this node in the virtual network.') + '</br>' +
 			_('Or mapping the local subnet to a non-overlapping IPv4 subnet in the virtual network.') + '</br>' +
 			_('Other peers can access the local devices through the mapped addresses.'));
@@ -461,7 +466,7 @@ return view.extend({
 		}
 		so.modalonly = true;
 
-		so = ss.taboption('field_routes', form.MultiValue, 'routes', _('Manual routes'),
+		so = ss.taboption('field_route', form.MultiValue, 'routes', _('Manual route'),
 			_('Manually specify the IPv4 subnets to be accessed via the virtual network.') + '</br>' +
 			_('%s and %s will no longer be automatically installed.')
 			.format(_('Subnet proxy'), _('Wireguard routes propagated from peers')));
@@ -484,7 +489,7 @@ return view.extend({
 		}
 		so.modalonly = true;
 
-		so = ss.taboption('field_routes', form.MultiValue, 'exit_nodes', _('Exit gateways'),
+		so = ss.taboption('field_route', form.MultiValue, 'exit_nodes', _('Exit gateway'),
 			_('Exit nodes are used to forward traffic destined for outside the virtual network.') + '</br>' +
 			_('Allows %s').format(_('Virtual IPv4 address') + '/' + _('Virtual IPv6 address') + '/' + _('IPv6 GUA')));
 		so.create = true;
@@ -564,11 +569,6 @@ return view.extend({
 		so = ss.taboption('field_server', form.Flag, 'enable_exit_node', _('As exit gateway'),
 			_('Allow this node to be an exit gateway.'));
 		so.default = so.disabled;
-
-		so = ss.taboption('field_server', form.Value, 'socks5_proxy', _('Socks5 server'),
-			_('Allow socks5 client to access virtual network.'));
-		so.datatype = 'ipaddrport(1)';
-		so.placeholder = '0.0.0.0:1080';
 
 		so = ss.taboption('field_server', form.Flag, 'no_listener', _('No listener'));
 		so.default = so.disabled;
