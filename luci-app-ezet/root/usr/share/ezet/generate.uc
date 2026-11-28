@@ -208,10 +208,9 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 		/* Peers settings */
 		peer: filter(get_peers(cfg.peers) || [], v => !isEmpty(v)),
 
-		/* Proxy networks settings */
+		/* Routes settings */
 		proxy_network: filter(get_proxy_networks(cfg.proxy_networks) || [], v => !isEmpty(v)),
-
-		/* Exit nodes settings */
+		routes: cfg.routes || [],
 		exit_nodes: cfg.exit_nodes || [],
 
 		/* Listener settings */
@@ -225,6 +224,7 @@ uci.foreach(uciconf, uciinst, (cfg) => {
 
 		/* Flags settings */
 		flags: {
+			enable_exit_node: strToBool(cfg.enable_exit_node),
 			private_mode: strToBool(cfg.private_mode),
 		},
 	});

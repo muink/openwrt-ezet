@@ -274,6 +274,7 @@ return view.extend({
 
 		ss.tab('field_Base', _('Base fields'));
 		ss.tab('field_secure', _('🔒Secure fields'));
+		ss.tab('field_routes', _('Routes fields'));
 		ss.tab('field_server', _('Server fields'));
 
 		/** Base fields **/
@@ -392,8 +393,34 @@ return view.extend({
 		so.rmempty = false;
 		so.modalonly = true;
 
-		so = ss.taboption('field_Base', form.MultiValue, 'proxy_networks', _('Subnet proxy'),
-			_('List of local subnets (CIDR) to be open to other peers.') + '</br>' +
+		/** Secure fields **/
+		so = ss.taboption('field_secure', ez.GenValue, 'local_private_key', _('Client private key'),
+			_('Base64 encoded X25519 private key.'));
+		so.password = true;
+		so.ez_options = {
+			type: 'wg-keypair',
+			callback: function(result) {
+				return [
+					[this.option, result.private_key],
+					['local_public_key', result.public_key]
+				]
+			}
+		}
+		so.validate = L.bind(ez.validateBase64Key, so, 44);
+		so.rmempty = false;
+		so.retain = true;
+		so.depends({secure_mode: '1', credential: ''});
+		so.modalonly = true;
+
+		so = ss.taboption('field_secure', ez.CopyValue, 'local_public_key', _('Client public key'),
+			_('Base64 encoded X25519 public key.'));
+		so.retain = true;
+		so.depends({secure_mode: '1', credential: ''});
+		so.modalonly = true;
+
+		/** Routes fields **/
+		so = ss.taboption('field_routes', form.MultiValue, 'proxy_networks', _('Subnet proxy'),
+			_('Open local IPv4 subnets to other peers via this node in the EasyTier network.') + '</br>' +
 			_('Or mapping the local subnet to a non-overlapping IPv4 subnet in the EasyTier network.') + '</br>' +
 			_('Other peers can access the local devices through the mapped addresses.'));
 		so.create = true;
@@ -434,10 +461,32 @@ return view.extend({
 		}
 		so.modalonly = true;
 
-		so = ss.taboption('field_Base', form.MultiValue, 'exit_nodes', _('Exit nodes'),
-			_('Exit nodes to forward all traffic to.') + '</br>' +
-			_('Allows %s').format(_('Virtual IPv4 address') + '/' + _('Virtual IPv6 address') + '/' + _('IPv6 GUA')) + '</br>' +
-			_('Specify which peers should forward traffic destined for external IPs.'));
+		so = ss.taboption('field_routes', form.MultiValue, 'routes', _('Manual routes'),
+			_('Manually specify the IPv4 subnets to be accessed via the EasyTier network.') + '</br>' +
+			_('%s and %s will no longer be automatically installed.')
+			.format(_('Subnet proxy'), _('Wireguard routes propagated from peers')));
+		so.create = true;
+		so.custom_placeholder = '192.168.0.0/16';
+		so.placeholder = '192.168.0.0/16';
+		so.value('', _('-- Please choose --'));
+		so.validate = function(section_id, value) {
+			const values = value.split(' ');
+
+			for (value of values) {
+				if (ez.isEmpty(value))
+					return true;
+
+				if (!ez.stubValidator.apply('cidr4', value, [1]))
+					return _('Expecting: %s').format(_('valid IPv4 CIDR.'));
+			}
+
+			return true;
+		}
+		so.modalonly = true;
+
+		so = ss.taboption('field_routes', form.MultiValue, 'exit_nodes', _('Exit gateways'),
+			_('Exit nodes are used to forward traffic destined for outside the EasyTier network.') + '</br>' +
+			_('Allows %s').format(_('Virtual IPv4 address') + '/' + _('Virtual IPv6 address') + '/' + _('IPv6 GUA')));
 		so.create = true;
 		so.custom_placeholder = '10.11.12.3';
 		so.placeholder = '10.11.12.3';
@@ -455,31 +504,6 @@ return view.extend({
 
 			return true;
 		}
-		so.modalonly = true;
-
-		/** Secure fields **/
-		so = ss.taboption('field_secure', ez.GenValue, 'local_private_key', _('Client private key'),
-			_('Base64 encoded X25519 private key.'));
-		so.password = true;
-		so.ez_options = {
-			type: 'wg-keypair',
-			callback: function(result) {
-				return [
-					[this.option, result.private_key],
-					['local_public_key', result.public_key]
-				]
-			}
-		}
-		so.validate = L.bind(ez.validateBase64Key, so, 44);
-		so.rmempty = false;
-		so.retain = true;
-		so.depends({secure_mode: '1', credential: ''});
-		so.modalonly = true;
-
-		so = ss.taboption('field_secure', ez.CopyValue, 'local_public_key', _('Client public key'),
-			_('Base64 encoded X25519 public key.'));
-		so.retain = true;
-		so.depends({secure_mode: '1', credential: ''});
 		so.modalonly = true;
 
 		/** Server fields **/
@@ -536,6 +560,10 @@ return view.extend({
 		}
 		so.depends('ipv6_public_addr_provider', '1');
 		so.modalonly = true;
+
+		so = ss.taboption('field_server', form.Flag, 'enable_exit_node', _('As exit gateway'),
+			_('Allow this node to be an exit gateway.'));
+		so.default = so.disabled;
 
 		so = ss.taboption('field_server', form.Flag, 'no_listener', _('No listener'));
 		so.default = so.disabled;
